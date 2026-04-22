@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '.github/workflows/**'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ca-certificates \
+            cmake \
+            curl \
+            libssl-dev \
+            ninja-build \
+            nlohmann-json3-dev \
+            pkg-config \
+            qtbase5-dev \
+            qtwebengine5-dev \
+            uuid-dev
+
+      - name: Build libevent
+        run: ./scripts/build-libevent.sh "$GITHUB_WORKSPACE/.deps/libevent"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DMADT_LIBEVENT_ROOT="$GITHUB_WORKSPACE/.deps/libevent/install"
+
+      - name: Build
+        run: cmake --build build --parallel

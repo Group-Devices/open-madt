@@ -1,0 +1,135 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to create, for example v1.0.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.prepare.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Prepare tag
+        id: prepare
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [ -z "${TAG}" ]; then
+            echo "Tag input is required" >&2
+            exit 1
+          fi
+
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists" >&2
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.prepare.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+  build-assets:
+    runs-on: ubuntu-22.04
+    needs: tag
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.tag.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ca-certificates \
+            cmake \
+            curl \
+            libssl-dev \
+            ninja-build \
+            nlohmann-json3-dev \
+            pkg-config \
+            qtbase5-dev \
+            qtwebengine5-dev \
+            uuid-dev
+
+      - name: Build libevent
+        run: ./scripts/build-libevent.sh "$GITHUB_WORKSPACE/.deps/libevent"
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DMADT_LIBEVENT_ROOT="$GITHUB_WORKSPACE/.deps/libevent/install"
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Package source archive
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          mkdir -p dist
+          git archive \
+            --format=tar.gz \
+            --prefix="madt-${TAG}/" \
+            --output="dist/madt-${TAG}.tar.gz" \
+            "${TAG}"
+
+      - name: Package Linux artifact
+        env:
+          TAG: ${{ needs.tag.outputs.tag }}
+        run: |
+          mkdir -p "dist/madt-${TAG}-linux-x86_64/bin"
+          cp build/madt-server/madt-server "dist/madt-${TAG}-linux-x86_64/bin/"
+          cp README.md "dist/madt-${TAG}-linux-x86_64/"
+          tar -C dist -czf "dist/madt-${TAG}-linux-x86_64.tar.gz" "madt-${TAG}-linux-x86_64"
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: dist/*
+
+  release:
+    runs-on: ubuntu-22.04
+    needs:
+      - tag
+      - build-assets
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.tag.outputs.tag }}
+          name: ${{ needs.tag.outputs.tag }}
+          files: dist/*
+          generate_release_notes: true

@@ -1,0 +1,16 @@
+This project uses Qt.
+
+Qt is developed by The Qt Company Ltd. and other contributors.
+Qt is available under commercial terms and under open-source licenses,
+including the GNU Lesser General Public License (LGPL) version 3 and the
+GNU General Public License (GPL) version 2 or version 3, depending on the
+module and distribution terms in use.
+
+This repository distributes the MADT application source code under the
+GNU General Public License version 3.0. See the LICENSE file for the full
+license text applying to this project itself.
+
+When distributing binaries built with Qt, you must also comply with the
+license terms that apply to the Qt libraries and modules used by that build.
+Refer to the Qt documentation and the license files provided with the Qt
+packages used for distribution.

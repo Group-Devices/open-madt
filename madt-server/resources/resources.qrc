@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/madt">
+    <file>qt-logo-black-and-white.png</file>
+  </qresource>
+</RCC>
