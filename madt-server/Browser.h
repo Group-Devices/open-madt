@@ -4,8 +4,13 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
+#include <QtCore/QTimer>
+#include <QtWidgets/QFrame>
+#include <QtWidgets/QGridLayout>
 #include <QtWidgets/QTabWidget>
+#include <QtWidgets/QToolButton>
 #if defined(USE_WEBENGINEVIEW)
 #include <QtWebEngineWidgets/QWebEngineView>
 #define QPAGE QWebEnginePage
@@ -16,7 +21,9 @@
 #define QVIEW QWebView
 #endif
 
+#include "IconLoader.h"
 #include "gui.h"
+#include "runtime-config.h"
 
 namespace Secretary::Madt::Gui {
 	class CustomPage : public QPAGE
@@ -39,39 +46,129 @@ namespace Secretary::Madt::Gui {
 	{
 		WebView*    view;
 		std::string url;
+		std::string iconUrl;
+		std::string uuid;
 		int         index;
+		int         logicalPos;
+		int         preferredPos;
+		int         flags;
+		QIcon       icon;
+		QTimer*     blinkTimer;
+		bool        blinkVisible;
+	};
+
+	struct ShortcutEntry
+	{
+		std::string shortcutId;
+		std::string iconUrl;
+		std::string url;
+		int         shortcutPos;
+		int         preferredPos;
+		int         flags;
+		QIcon       icon;
 	};
 
 	class Browser : public QTabWidget
 	{
 		Q_OBJECT
 	  public:
-		Browser();
+		explicit Browser(const RuntimeConfig& runtimeConfig, QWidget* parent = nullptr);
 		~Browser();
 
 	  signals:
-		void signalNewWebTab(const std::string& url, const std::string& uuid);
+		void signalNewWebTab(const std::string& url,
+		                     const std::string& iconUrl,
+		                     int                preferredPos,
+		                     int                flags,
+		                     const std::string& uuid,
+		                     CmdResponse*       resp);
 		void signalActivateTab(const std::string& uuid, CmdResponse* resp);
 		void signalNavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 		void signalGetTabMap(CmdResponse* resp);
 		void signalKillTab(const std::string& uuid, CmdResponse* resp);
+		void signalBlinkTab(const std::string& uuid, CmdResponse* resp);
+		void signalNewShortcut(const std::string& url,
+		                       const std::string& iconUrl,
+		                       int                preferredPos,
+		                       int                flags,
+		                       const std::string& shortcutId,
+		                       CmdResponse*       resp);
+		void signalKillShortcut(const std::string& shortcutId, CmdResponse* resp);
+		void signalGetShortcuts(CmdResponse* resp);
 
 	  public slots:
-		void onNewWebTab(const std::string& url, const std::string& uuid);
+		void onNewWebTab(const std::string& url,
+		                 const std::string& iconUrl,
+		                 int                preferredPos,
+		                 int                flags,
+		                 const std::string& uuid,
+		                 CmdResponse*       resp);
 		void onActivateTab(const std::string& uuid, CmdResponse* resp);
 		void onNavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 		void onGetTabMap(CmdResponse* resp);
 		void onKillTab(const std::string& uuid, CmdResponse* resp);
+		void onBlinkTab(const std::string& uuid, CmdResponse* resp);
+		void onNewShortcut(const std::string& url,
+		                   const std::string& iconUrl,
+		                   int                preferredPos,
+		                   int                flags,
+		                   const std::string& shortcutId,
+		                   CmdResponse*       resp);
+		void onKillShortcut(const std::string& shortcutId, CmdResponse* resp);
+		void onGetShortcuts(CmdResponse* resp);
 
 	  public:
-		void NewWebTab(const std::string& url, const std::string& uuid);
+		void NewWebTab(const std::string& url,
+		               const std::string& iconUrl,
+		               int                preferredPos,
+		               int                flags,
+		               const std::string& uuid,
+		               CmdResponse*       resp);
 		void ActivateTab(const std::string& uuid, CmdResponse* resp);
 		void NavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 		void GetTabMap(CmdResponse* resp);
 		void KillTab(const std::string& uuid, CmdResponse* resp);
+		void BlinkTab(const std::string& uuid, CmdResponse* resp);
+		void NewShortcut(const std::string& url,
+		                 const std::string& iconUrl,
+		                 int                preferredPos,
+		                 int                flags,
+		                 const std::string& shortcutId,
+		                 CmdResponse*       resp);
+		void KillShortcut(const std::string& shortcutId, CmdResponse* resp);
+		void GetShortcuts(CmdResponse* resp);
 
 	  private:
+		void applyRuntimeConfig();
+		void applyPageIcon(BrowserPage* page);
+		void stopBlink(BrowserPage* page);
+		void updatePageIndex(BrowserPage* page);
+		void applyPageLabel(BrowserPage* page);
+		void syncTabOrder();
+		bool allocateLogicalPosition(BrowserPage* page);
+		bool allocateAbsolutePosition(BrowserPage* page);
+		bool allocateZonePosition(BrowserPage* page, int preferredPos);
+		bool configureView(BrowserPage* page);
+		std::vector<BrowserPage*> pagesInDisplayOrder() const;
+		std::vector<int>          freePositionsInRange(int start, int end) const;
+		std::vector<BrowserPage*> pagesInRange(int start, int end) const;
+		void                      setupShortcutUi();
+		void                      updateShortcutLauncherState();
+		void                      rebuildShortcutPopup();
+		void                      toggleShortcutPopup();
+		void                      activateShortcut(const std::string& shortcutId);
+		bool                      allocateShortcutPosition(ShortcutEntry* shortcut);
+		std::vector<ShortcutEntry*> shortcutsInDisplayOrder() const;
+		std::vector<int>            freeShortcutPositions() const;
+		int                         maxShortcutCount() const;
+
+		RuntimeConfig                    runtimeConfig;
+		IconLoader                       iconLoader;
 		std::map<std::string, BrowserPage*> list;
+		std::map<std::string, ShortcutEntry*> shortcuts;
+		QToolButton*                     shortcutLauncher = nullptr;
+		QFrame*                          shortcutPopup    = nullptr;
+		QGridLayout*                     shortcutLayout   = nullptr;
 	};
 }
 #endif

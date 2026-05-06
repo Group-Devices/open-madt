@@ -39,6 +39,7 @@ if(GIT_FOUND)
 endif()
 
 option(MADT_USE_WEBENGINEVIEW "Use Qt WebEngine instead of Qt WebKit" ON)
+option(MADT_USE_AVAHI "Enable Avahi DNS-SD publication for madt-server" OFF)
 set(MADT_LOG_LEVEL "INFO" CACHE STRING "Compile-time log level: DEBUG, INFO, WARN, or ERROR")
 set_property(CACHE MADT_LOG_LEVEL PROPERTY STRINGS DEBUG INFO WARN ERROR)
 set(MADT_LIBEVENT_ROOT "" CACHE PATH "Prefix containing a libevent installation")

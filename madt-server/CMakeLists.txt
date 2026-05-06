@@ -1,4 +1,5 @@
-find_package(Qt5 REQUIRED COMPONENTS Widgets)
+find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
+find_package(OpenSSL REQUIRED)
 if(MADT_USE_WEBENGINEVIEW)
     find_package(Qt5 REQUIRED COMPONENTS WebEngineWidgets)
 else()
@@ -10,10 +11,13 @@ find_program(MADT_HOST_RCC rcc REQUIRED)
 find_library(UUID_LIBRARY uuid REQUIRED)
 
 add_executable(madt-server
+    AvahiService.cpp
     main.cpp
     gui.cpp
     Browser.cpp
+    IconLoader.cpp
     madt-server.cpp
+    runtime-config.cpp
     resources/resources.qrc
 )
 target_compile_definitions(madt-server PRIVATE MODULE_NAME="madt")
@@ -27,9 +31,17 @@ target_link_libraries(madt-server PRIVATE
     wrapper_process
     wrapper_wdog
     nlohmann_json::nlohmann_json
+    OpenSSL::Crypto
+    Qt5::Network
     Qt5::Widgets
     ${UUID_LIBRARY}
 )
+if(MADT_USE_AVAHI)
+    find_package( avahi-client REQUIRED)
+
+    target_compile_definitions(madt-server PRIVATE MADT_USE_AVAHI=1)
+    target_link_libraries(madt-server PRIVATE avahi-client::avahi)
+endif()
 if(MADT_USE_WEBENGINEVIEW)
     target_link_libraries(madt-server PRIVATE Qt5::WebEngineWidgets)
 else()

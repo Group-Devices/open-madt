@@ -45,6 +45,94 @@ cmake --build build
 
 The local logging shim uses a compile-time threshold controlled by `MADT_LOG_LEVEL`, which defaults to `INFO`. Accepted values are `DEBUG`, `INFO`, `WARN`, and `ERROR`.
 
+## Runtime configuration
+
+At runtime, the server optionally reads `madt-config.json` from its working
+directory.
+
+Currently supported keys:
+- `tabMapPassword`: password used by `GetTabMap`
+- `controlPassword`: password used by `Stop` and `Restart`
+- `controlPsk`: optional PSK used for token-based `Stop` / `Restart` authorization
+- `controlNonceTtlSeconds`: lifetime of `GetRandom` control nonces
+- `tabLifetimeByConnection`: when `true`, tabs created through a TCP connection
+  are deleted when that connection closes; when `false`, tab lifetime is
+  decoupled from socket lifetime
+- `soundPlayerCommand`: local command used to play configured sound files,
+  default `aplay`
+- `soundFiles`: mapping from standard MADT sound aliases such as
+  `SystemNotification` to local file paths
+- `tabBarVisible`: show or hide the tab bar
+- `tabBarEdge`: one of `top`, `bottom`, `left`, `right`
+- `tabBarWidth`: tab width in pixels
+- `tabBarHeight`: tab height in pixels
+- `tabBarShowLabels`: show the numeric tab labels
+- `tabBarShowTooltips`: show the tab URL as tooltip text
+- `tabBarUseScrollButtons`: enable or disable scroll buttons on the tab bar
+- `shortcutsEnabled`: globally enable shortcut support
+- `shortcutLauncherVisible`: show or hide the shortcut launcher button
+- `shortcutLauncherLabel`: text displayed on the launcher button
+- `shortcutLauncherCorner`: one of `top-left`, `top-right`
+- `shortcutPopupTitle`: title shown above the shortcut grid
+- `shortcutPopupColumns`: number of columns in the shortcut popup grid
+- `shortcutIconWidth`: shortcut button icon width
+- `shortcutIconHeight`: shortcut button icon height
+- `shortcutMaxCount`: maximum number of live shortcuts accepted by the UI
+- `shortcutAutoClose`: close the popup after shortcut activation
+- `volume`, `brightness`, `contrast`, `language`, `defaultActiveMode`,
+  `activeMode`, `defaultVisualMode`, `visualMode`, `extra1`, `extra2`:
+  initial values returned by `GetSettings` and updated in memory by
+  `SetSettings`
+
+If `tabLifetimeByConnection` is omitted, the standalone `open-madt` default is
+`false`.
+
+If the tab bar keys are omitted, the standalone defaults are:
+- `tabBarVisible=true`
+- `tabBarEdge=top`
+- `tabBarWidth=96`
+- `tabBarHeight=48`
+
+## Conformance Testing
+
+This repository includes a live-server protocol conformance runner:
+
+```bash
+python3 ./scripts/madt_conformance.py --host 127.0.0.1 --port 25000
+```
+
+Useful options:
+
+```bash
+python3 ./scripts/madt_conformance.py \
+  --host 127.0.0.1 \
+  --port 25000 \
+  --tab-map-password '<tab-map-password>' \
+  --control-psk '<control-psk>'
+```
+
+By default the script is non-destructive. `Stop` / `Restart` are only executed
+when `--control-action` is provided together with `--i-understand`.
+
+## Client Simulator
+
+For manual protocol testing, a simple MADT client simulator is available:
+
+```bash
+python3 ./scripts/madt_client_sim.py --pretty get-info
+python3 ./scripts/madt_client_sim.py --pretty get-settings
+python3 ./scripts/madt_client_sim.py --pretty play-sound --sound-id SystemNotification
+python3 ./scripts/madt_client_sim.py --pretty new-web-tab --url 'data:text/html,<html><body>Hello</body></html>'
+python3 ./scripts/madt_client_sim.py --pretty new-shortcut --url 'https://example.org'
+```
+
+Authenticated examples:
+
+```bash
+python3 ./scripts/madt_client_sim.py --pretty get-tab-map --password '<tab-map-password>'
+python3 ./scripts/madt_client_sim.py --pretty stop --control-psk '<control-psk>'
+```
+
 ## License
 
 This project is distributed under the GNU General Public License v3.0.
