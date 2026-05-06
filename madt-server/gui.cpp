@@ -7,6 +7,7 @@
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
 #include <QtCore/QMetaObject>
+#include <QtCore/QProcess>
 #include <QtCore/QTimer>
 #include <QtGui/QPixmap>
 #include <QtWidgets/QApplication>
@@ -16,6 +17,7 @@
 
 #include "Browser.h"
 #include "gui.h"
+#include "runtime-config.h"
 
 namespace Secretary::Madt::Gui {
 	namespace {
@@ -32,6 +34,7 @@ namespace Secretary::Madt::Gui {
 		bool startupReady     = false;
 		bool startupCancelled = false;
 		int requestedExitCode = 0;
+		RuntimeConfig runtimeConfig;
 
 		QWidget* createStartupContent(QWidget* parent)
 		{
@@ -80,6 +83,7 @@ namespace Secretary::Madt::Gui {
 		QApplication app(argc, argv);
 		appInstance = &app;
 		requestedExitCode = 0;
+		runtimeConfig = loadRuntimeConfig();
 		setStartupState(false, false);
 
 		qRegisterMetaType<std::string>("std::string");
@@ -106,7 +110,7 @@ namespace Secretary::Madt::Gui {
 				return;
 			}
 
-			browser = new Browser();
+			browser = new Browser(runtimeConfig);
 			if (mainLayout != nullptr) {
 				if (startupContent != nullptr) {
 					mainLayout->removeWidget(startupContent);
@@ -162,11 +166,16 @@ namespace Secretary::Madt::Gui {
 		return startupReady;
 	}
 
-	bool NewWebTab(const std::string& url, const std::string& uuid)
+	bool NewWebTab(const std::string& url,
+	               const std::string& iconUrl,
+	               int                preferredPos,
+	               int                flags,
+	               const std::string& uuid,
+	               CmdResponse*       resp)
 	{
 		bool ret = false;
 		if (browser) {
-			browser->NewWebTab(url, uuid);
+			browser->NewWebTab(url, iconUrl, preferredPos, flags, uuid, resp);
 			ret = true;
 		}
 		return ret;
@@ -218,6 +227,75 @@ namespace Secretary::Madt::Gui {
 	{
 		if (browser)
 			browser->GetTabMap(resp);
+		return (browser != nullptr);
+	}
+
+	bool BlinkTab(const std::string& uuid, CmdResponse* resp)
+	{
+		if (browser)
+			browser->BlinkTab(uuid, resp);
+		return (browser != nullptr);
+	}
+
+	bool PlaySound(const std::string& soundId,
+	               unsigned int       soundFlags,
+	               const std::string& soundFile,
+	               const std::string& soundPlayerCommand,
+	               CmdResponse*       resp)
+	{
+		(void)soundId;
+		(void)soundFlags;
+		if (resp == nullptr || appInstance == nullptr) {
+			return false;
+		}
+
+		QMetaObject::invokeMethod(
+		  appInstance,
+		  [resp, soundFile, soundPlayerCommand]() {
+			  bool played = false;
+			  if (!soundFile.empty() && QFileInfo::exists(QString::fromStdString(soundFile)) &&
+			      !soundPlayerCommand.empty()) {
+				  played = QProcess::startDetached(QString::fromStdString(soundPlayerCommand),
+				                                   { QString::fromStdString(soundFile) });
+			  }
+			  if (!played) {
+				  QApplication::beep();
+			  }
+			  std::lock_guard<std::mutex> lock(resp->mtx);
+			  resp->result = CmdResponse::ResultCode::OK;
+			  resp->ready  = true;
+			  resp->cv.notify_one();
+		  },
+		  Qt::QueuedConnection);
+		return true;
+	}
+
+	bool NewShortcut(const std::string& url,
+	                 const std::string& iconUrl,
+	                 int                preferredPos,
+	                 int                flags,
+	                 const std::string& shortcutId,
+	                 CmdResponse*       resp)
+	{
+		if (browser) {
+			browser->NewShortcut(url, iconUrl, preferredPos, flags, shortcutId, resp);
+		}
+		return (browser != nullptr);
+	}
+
+	bool KillShortcut(const std::string& shortcutId, CmdResponse* resp)
+	{
+		if (browser) {
+			browser->KillShortcut(shortcutId, resp);
+		}
+		return (browser != nullptr);
+	}
+
+	bool GetShortcuts(CmdResponse* resp)
+	{
+		if (browser) {
+			browser->GetShortcuts(resp);
+		}
 		return (browser != nullptr);
 	}
 }
