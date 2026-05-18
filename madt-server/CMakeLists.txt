@@ -1,13 +1,41 @@
-find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
 find_package(OpenSSL REQUIRED)
 if(MADT_USE_WEBENGINEVIEW)
-    find_package(Qt5 REQUIRED COMPONENTS WebEngineWidgets)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+    find_package(Qt6 REQUIRED COMPONENTS WebEngineWidgets)
+    set(MADT_QT_WIDGETS_TARGET Qt6::Widgets)
+    set(MADT_QT_NETWORK_TARGET Qt6::Network)
+    set(MADT_QT_WEB_TARGET Qt6::WebEngineWidgets)
+    find_program(MADT_HOST_MOC
+        NAMES moc
+        HINTS /usr/lib/qt6/libexec
+        NO_DEFAULT_PATH
+        REQUIRED
+    )
+    find_program(MADT_HOST_RCC
+        NAMES rcc
+        HINTS /usr/lib/qt6/libexec
+        NO_DEFAULT_PATH
+        REQUIRED
+    )
 else()
+    find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
     find_package(Qt5 REQUIRED COMPONENTS WebKitWidgets)
+    set(MADT_QT_WIDGETS_TARGET Qt5::Widgets)
+    set(MADT_QT_NETWORK_TARGET Qt5::Network)
+    set(MADT_QT_WEB_TARGET Qt5::WebKitWidgets)
+    find_program(MADT_HOST_MOC
+        NAMES moc
+        HINTS /usr/lib/qt5/bin
+        NO_DEFAULT_PATH
+        REQUIRED
+    )
+    find_program(MADT_HOST_RCC
+        NAMES rcc
+        HINTS /usr/lib/qt5/bin
+        NO_DEFAULT_PATH
+        REQUIRED
+    )
 endif()
-
-find_program(MADT_HOST_MOC moc REQUIRED)
-find_program(MADT_HOST_RCC rcc REQUIRED)
 find_library(UUID_LIBRARY uuid REQUIRED)
 
 add_executable(madt-server
@@ -32,8 +60,8 @@ target_link_libraries(madt-server PRIVATE
     wrapper_wdog
     nlohmann_json::nlohmann_json
     OpenSSL::Crypto
-    Qt5::Network
-    Qt5::Widgets
+    ${MADT_QT_NETWORK_TARGET}
+    ${MADT_QT_WIDGETS_TARGET}
     ${UUID_LIBRARY}
 )
 if(MADT_USE_AVAHI)
@@ -43,9 +71,9 @@ if(MADT_USE_AVAHI)
     target_link_libraries(madt-server PRIVATE avahi-client::avahi)
 endif()
 if(MADT_USE_WEBENGINEVIEW)
-    target_link_libraries(madt-server PRIVATE Qt5::WebEngineWidgets)
+    target_link_libraries(madt-server PRIVATE ${MADT_QT_WEB_TARGET})
 else()
-    target_link_libraries(madt-server PRIVATE Qt5::WebKitWidgets)
+    target_link_libraries(madt-server PRIVATE ${MADT_QT_WEB_TARGET})
 endif()
 set_target_properties(madt-server PROPERTIES AUTOMOC_EXECUTABLE "${MADT_HOST_MOC}")
 set_target_properties(madt-server PROPERTIES AUTORCC_EXECUTABLE "${MADT_HOST_RCC}")
