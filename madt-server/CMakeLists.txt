@@ -1,18 +1,34 @@
 find_package(OpenSSL REQUIRED)
 if(MADT_USE_WEBENGINEVIEW)
-    find_package(Qt6 REQUIRED COMPONENTS CoreTools Widgets Network WebEngineWidgets)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Network WebEngineWidgets)
     set(MADT_QT_WIDGETS_TARGET Qt6::Widgets)
     set(MADT_QT_NETWORK_TARGET Qt6::Network)
     set(MADT_QT_WEB_TARGET Qt6::WebEngineWidgets)
-    get_target_property(MADT_HOST_MOC Qt6::moc IMPORTED_LOCATION)
-    get_target_property(MADT_HOST_RCC Qt6::rcc IMPORTED_LOCATION)
+    find_program(MADT_HOST_MOC
+        NAMES moc
+        HINTS /usr/lib/qt6/libexec
+        REQUIRED
+    )
+    find_program(MADT_HOST_RCC
+        NAMES rcc
+        HINTS /usr/lib/qt6/libexec
+        REQUIRED
+    )
 else()
     find_package(Qt5 REQUIRED COMPONENTS Core Widgets Network WebKitWidgets)
     set(MADT_QT_WIDGETS_TARGET Qt5::Widgets)
     set(MADT_QT_NETWORK_TARGET Qt5::Network)
     set(MADT_QT_WEB_TARGET Qt5::WebKitWidgets)
-    set(MADT_HOST_MOC "${Qt5Core_MOC_EXECUTABLE}")
-    set(MADT_HOST_RCC "${Qt5Core_RCC_EXECUTABLE}")
+    find_program(MADT_HOST_MOC
+        NAMES moc
+        HINTS /usr/lib/qt5/bin
+        REQUIRED
+    )
+    find_program(MADT_HOST_RCC
+        NAMES rcc
+        HINTS /usr/lib/qt5/bin
+        REQUIRED
+    )
 endif()
 
 if(NOT MADT_HOST_MOC)
