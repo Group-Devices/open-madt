@@ -29,8 +29,9 @@ jobs:
             ninja-build \
             nlohmann-json3-dev \
             pkg-config \
-            qtbase5-dev \
-            qtwebengine5-dev \
+            qt6-base-dev \
+            qt6-base-dev-tools \
+            qt6-webengine-dev \
             uuid-dev
 
       - name: Build libevent
