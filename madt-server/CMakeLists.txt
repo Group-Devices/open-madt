@@ -1,7 +1,6 @@
 find_package(OpenSSL REQUIRED)
 if(MADT_USE_WEBENGINEVIEW)
-    find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
-    find_package(Qt6 REQUIRED COMPONENTS WebEngineWidgets)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Network WebEngineWidgets)
     set(MADT_QT_WIDGETS_TARGET Qt6::Widgets)
     set(MADT_QT_NETWORK_TARGET Qt6::Network)
     set(MADT_QT_WEB_TARGET Qt6::WebEngineWidgets)
@@ -16,8 +15,7 @@ if(MADT_USE_WEBENGINEVIEW)
         REQUIRED
     )
 else()
-    find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
-    find_package(Qt5 REQUIRED COMPONENTS WebKitWidgets)
+    find_package(Qt5 REQUIRED COMPONENTS Core Widgets Network WebKitWidgets)
     set(MADT_QT_WIDGETS_TARGET Qt5::Widgets)
     set(MADT_QT_NETWORK_TARGET Qt5::Network)
     set(MADT_QT_WEB_TARGET Qt5::WebKitWidgets)
@@ -31,6 +29,13 @@ else()
         HINTS /usr/lib/qt5/bin
         REQUIRED
     )
+endif()
+
+if(NOT MADT_HOST_MOC)
+    message(FATAL_ERROR "Could not resolve MADT host moc from the active Qt package")
+endif()
+if(NOT MADT_HOST_RCC)
+    message(FATAL_ERROR "Could not resolve MADT host rcc from the active Qt package")
 endif()
 find_library(UUID_LIBRARY uuid REQUIRED)
 
