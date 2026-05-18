@@ -29,6 +29,7 @@ jobs:
             ninja-build \
             nlohmann-json3-dev \
             pkg-config \
+            libgl-dev \
             libopengl-dev \
             qt6-base-dev \
             qt6-base-dev-tools \
