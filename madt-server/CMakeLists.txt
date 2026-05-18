@@ -5,37 +5,15 @@ if(MADT_USE_WEBENGINEVIEW)
     set(MADT_QT_WIDGETS_TARGET Qt6::Widgets)
     set(MADT_QT_NETWORK_TARGET Qt6::Network)
     set(MADT_QT_WEB_TARGET Qt6::WebEngineWidgets)
-    find_program(MADT_HOST_MOC
-        NAMES moc
-        HINTS /usr/lib/qt6/libexec
-        NO_DEFAULT_PATH
-        REQUIRED
-    )
-    find_program(MADT_HOST_RCC
-        NAMES rcc
-        HINTS /usr/lib/qt6/libexec
-        NO_DEFAULT_PATH
-        REQUIRED
-    )
 else()
     find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
     find_package(Qt5 REQUIRED COMPONENTS WebKitWidgets)
     set(MADT_QT_WIDGETS_TARGET Qt5::Widgets)
     set(MADT_QT_NETWORK_TARGET Qt5::Network)
     set(MADT_QT_WEB_TARGET Qt5::WebKitWidgets)
-    find_program(MADT_HOST_MOC
-        NAMES moc
-        HINTS /usr/lib/qt5/bin
-        NO_DEFAULT_PATH
-        REQUIRED
-    )
-    find_program(MADT_HOST_RCC
-        NAMES rcc
-        HINTS /usr/lib/qt5/bin
-        NO_DEFAULT_PATH
-        REQUIRED
-    )
 endif()
+find_program(MADT_HOST_MOC NAMES moc REQUIRED)
+find_program(MADT_HOST_RCC NAMES rcc REQUIRED)
 find_library(UUID_LIBRARY uuid REQUIRED)
 
 add_executable(madt-server
