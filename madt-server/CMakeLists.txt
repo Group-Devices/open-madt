@@ -1,8 +1,9 @@
-find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
 find_package(OpenSSL REQUIRED)
 if(MADT_USE_WEBENGINEVIEW)
-    find_package(Qt5 REQUIRED COMPONENTS WebEngineWidgets)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+    find_package(Qt6 REQUIRED COMPONENTS WebEngineWidgets)
 else()
+    find_package(Qt5 REQUIRED COMPONENTS Widgets Network)
     find_package(Qt5 REQUIRED COMPONENTS WebKitWidgets)
 endif()
 
@@ -32,8 +33,8 @@ target_link_libraries(madt-server PRIVATE
     wrapper_wdog
     nlohmann_json::nlohmann_json
     OpenSSL::Crypto
-    Qt5::Network
-    Qt5::Widgets
+    #Qt6::Network
+    #Qt6::Widgets
     ${UUID_LIBRARY}
 )
 if(MADT_USE_AVAHI)
@@ -43,7 +44,7 @@ if(MADT_USE_AVAHI)
     target_link_libraries(madt-server PRIVATE avahi-client::avahi)
 endif()
 if(MADT_USE_WEBENGINEVIEW)
-    target_link_libraries(madt-server PRIVATE Qt5::WebEngineWidgets)
+    target_link_libraries(madt-server PRIVATE Qt6::WebEngineWidgets)
 else()
     target_link_libraries(madt-server PRIVATE Qt5::WebKitWidgets)
 endif()

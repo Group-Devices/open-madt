@@ -10,6 +10,7 @@
 #include <QtCore/QProcess>
 #include <QtCore/QTimer>
 #include <QtGui/QPixmap>
+#include <QtGui/QScreen>
 #include <QtWidgets/QApplication>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QVBoxLayout>
@@ -35,6 +36,19 @@ namespace Secretary::Madt::Gui {
 		bool startupCancelled = false;
 		int requestedExitCode = 0;
 		RuntimeConfig runtimeConfig;
+
+		QRect currentScreenGeometry(QWidget* widget)
+		{
+			if (widget != nullptr && widget->screen() != nullptr) {
+				return widget->screen()->availableGeometry();
+			}
+
+			if (QGuiApplication::primaryScreen() != nullptr) {
+				return QGuiApplication::primaryScreen()->availableGeometry();
+			}
+
+			return QRect();
+		}
 
 		QWidget* createStartupContent(QWidget* parent)
 		{
@@ -94,6 +108,10 @@ namespace Secretary::Madt::Gui {
 		mainLayout->setContentsMargins(0, 0, 0, 0);
 		startupContent = createStartupContent(mainWindow);
 		mainLayout->addWidget(startupContent);
+		const QRect screenGeometry = currentScreenGeometry(mainWindow);
+		if (screenGeometry.isValid()) {
+			mainWindow->setGeometry(screenGeometry);
+		}
 		mainWindow->showFullScreen();
 		mainWindow->raise();
 		mainWindow->activateWindow();
@@ -118,6 +136,10 @@ namespace Secretary::Madt::Gui {
 					startupContent = nullptr;
 				}
 				mainLayout->addWidget(browser);
+			}
+			const QRect browserGeometry = currentScreenGeometry(mainWindow);
+			if (browserGeometry.isValid()) {
+				browser->resize(browserGeometry.size());
 			}
 			browser->show();
 			browser->raise();
@@ -210,9 +232,20 @@ namespace Secretary::Madt::Gui {
 
 		std::lock_guard<std::mutex> lock(resp->mtx);
 		if (browser != nullptr) {
+			QSize viewportSize = browser->contentsRect().size();
+			if (QWidget* currentPage = browser->currentWidget(); currentPage != nullptr) {
+				viewportSize = currentPage->contentsRect().size();
+				if (!viewportSize.isValid() || viewportSize.isEmpty()) {
+					viewportSize = currentPage->size();
+				}
+			}
+			if (!viewportSize.isValid() || viewportSize.isEmpty()) {
+				viewportSize = browser->size();
+			}
+
 			resp->payload = {
-				{ "winWidth", browser->width() },
-				{ "winHeight", browser->height() },
+				{ "winWidth", viewportSize.width() },
+				{ "winHeight", viewportSize.height() },
 			};
 			resp->result = CmdResponse::ResultCode::OK;
 		} else {
