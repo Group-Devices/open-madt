@@ -39,6 +39,12 @@ namespace Secretary::Madt {
 		TopRight
 	};
 
+	enum class ExtraZoneEdge
+	{
+		Top,
+		Bottom
+	};
+
 	struct RuntimeConfig
 	{
 		std::string tabMapPassword;
@@ -71,6 +77,9 @@ namespace Secretary::Madt {
 		int                    shortcutIconHeight      = 96;
 		int                    shortcutMaxCount        = 5;
 		bool                   shortcutAutoClose       = true;
+		int                    extraZoneHeight         = 160;
+		ExtraZoneEdge          extraZoneEdge           = ExtraZoneEdge::Top;
+		bool                   extraZoneAlwaysVisible  = false;
 		SettingsState settings;
 	};
 

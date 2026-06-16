@@ -154,6 +154,29 @@ namespace Secretary::Madt {
 			}
 		}
 
+		void loadExtraZoneEdge(const json& document, RuntimeConfig& config)
+		{
+			const auto edgeIt = document.find("extraZoneEdge");
+			if (edgeIt == document.end() || edgeIt->is_null()) {
+				return;
+			}
+			if (!edgeIt->is_string()) {
+				ELOG("MADT configuration %s has non-string extraZoneEdge", CONFIG_FILENAME);
+				return;
+			}
+
+			const auto edge = edgeIt->get<std::string>();
+			if (edge == "top") {
+				config.extraZoneEdge = ExtraZoneEdge::Top;
+			} else if (edge == "bottom") {
+				config.extraZoneEdge = ExtraZoneEdge::Bottom;
+			} else {
+				ELOG("MADT configuration %s has invalid extraZoneEdge '%s'",
+				     CONFIG_FILENAME,
+				     edge.c_str());
+			}
+		}
+
 		void loadSettings(const json& document, RuntimeConfig& config)
 		{
 			loadOptionalString(document, "volume", config.settings.volume);
@@ -384,6 +407,9 @@ namespace Secretary::Madt {
 		loadOptionalInt(document, "shortcutIconHeight", config.shortcutIconHeight, 1, 512);
 		loadOptionalInt(document, "shortcutMaxCount", config.shortcutMaxCount, 1, 20);
 		loadOptionalBool(document, "shortcutAutoClose", config.shortcutAutoClose);
+		loadOptionalInt(document, "extraZoneHeight", config.extraZoneHeight, 1, 1024);
+		loadExtraZoneEdge(document, config);
+		loadOptionalBool(document, "extraZoneAlwaysVisible", config.extraZoneAlwaysVisible);
 		loadSettings(document, config);
 		return config;
 	}

@@ -13,6 +13,7 @@
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QTabBar>
+#include <QtWidgets/QVBoxLayout>
 #if !defined(USE_WEBENGINEVIEW)
 #include <QtWebKitWidgets/QWebFrame>
 #endif
@@ -109,12 +110,43 @@ namespace Secretary::Madt::Gui {
 	WebView::~WebView() {}
 
 	Browser::Browser(const RuntimeConfig& runtimeConfig, QWidget* parent)
-	  : QTabWidget(parent)
+	  : QWidget(parent)
 	  , runtimeConfig(runtimeConfig)
 	  , iconLoader(this)
 	{
+		auto* layout = new QVBoxLayout(this);
+		layout->setContentsMargins(0, 0, 0, 0);
+		layout->setSpacing(0);
+
+		extraFrame = new QFrame(this);
+		extraFrame->setObjectName(QStringLiteral("extraZone"));
+		extraFrame->setFixedHeight(runtimeConfig.extraZoneHeight);
+		const QString extraZoneBorder =
+		  runtimeConfig.extraZoneEdge == ExtraZoneEdge::Bottom
+		    ? QStringLiteral("border-top: 1px solid #808080;")
+		    : QStringLiteral("border-bottom: 1px solid #808080;");
+		extraFrame->setStyleSheet(QStringLiteral("#extraZone { background-color: #ffffff; %1 }")
+		                            .arg(extraZoneBorder));
+
+		auto* extraLayout = new QVBoxLayout(extraFrame);
+		extraLayout->setContentsMargins(0, 0, 0, 0);
+		extraLayout->setSpacing(0);
+
+		extraStack = new QStackedWidget(extraFrame);
+		extraLayout->addWidget(extraStack);
+
+		tabs = new QTabWidget(this);
+		if (runtimeConfig.extraZoneEdge == ExtraZoneEdge::Top) {
+			layout->addWidget(extraFrame);
+			layout->addWidget(tabs, 1);
+		} else {
+			layout->addWidget(tabs, 1);
+			layout->addWidget(extraFrame);
+		}
+
 		applyRuntimeConfig();
 		setupShortcutUi();
+		updateExtraZoneVisibility();
 		connect(this,
 		        SIGNAL(signalNewWebTab(const std::string&,
 		                               const std::string&,
@@ -180,9 +212,18 @@ namespace Secretary::Madt::Gui {
 		}
 	}
 
+	QWidget* Browser::currentWidget() const
+	{
+		return tabs != nullptr ? tabs->currentWidget() : nullptr;
+	}
+
 	void Browser::applyRuntimeConfig()
 	{
-		QTabBar* bar = tabBar();
+		if (tabs == nullptr) {
+			return;
+		}
+
+		QTabBar* bar = tabs->tabBar();
 		bar->setVisible(runtimeConfig.tabBarVisible);
 		bar->setIconSize(QSize(runtimeConfig.tabBarWidth, runtimeConfig.tabBarHeight));
 		bar->setExpanding(false);
@@ -190,35 +231,37 @@ namespace Secretary::Madt::Gui {
 
 		switch (runtimeConfig.tabBarEdge) {
 			case TabBarEdge::Top:
-				setTabPosition(QTabWidget::North);
+				tabs->setTabPosition(QTabWidget::North);
 				break;
 			case TabBarEdge::Bottom:
-				setTabPosition(QTabWidget::South);
+				tabs->setTabPosition(QTabWidget::South);
 				break;
 			case TabBarEdge::Left:
-				setTabPosition(QTabWidget::West);
+				tabs->setTabPosition(QTabWidget::West);
 				break;
 			case TabBarEdge::Right:
-				setTabPosition(QTabWidget::East);
+				tabs->setTabPosition(QTabWidget::East);
 				break;
 		}
 
-		setStyleSheet(QStringLiteral("QTabBar::tab { width: %1px; height: %2px; }")
-		                .arg(runtimeConfig.tabBarWidth)
-		                .arg(runtimeConfig.tabBarHeight));
+		tabs->setStyleSheet(QStringLiteral("QTabBar::tab { width: %1px; height: %2px; }")
+		                      .arg(runtimeConfig.tabBarWidth)
+		                      .arg(runtimeConfig.tabBarHeight));
 	}
 
 	void Browser::setupShortcutUi()
 	{
-		shortcutLauncher = new QToolButton(this);
+		shortcutLauncher = new QToolButton(tabs);
 		shortcutLauncher->setText(QString::fromStdString(runtimeConfig.shortcutLauncherLabel));
 		shortcutLauncher->setEnabled(false);
 		shortcutLauncher->setToolButtonStyle(Qt::ToolButtonTextOnly);
 		shortcutLauncher->setAutoRaise(false);
-		setCornerWidget(shortcutLauncher,
-		                runtimeConfig.shortcutLauncherCorner == ShortcutLauncherCorner::TopLeft
-		                  ? Qt::TopLeftCorner
-		                  : Qt::TopRightCorner);
+		if (tabs != nullptr) {
+			tabs->setCornerWidget(shortcutLauncher,
+			                      runtimeConfig.shortcutLauncherCorner == ShortcutLauncherCorner::TopLeft
+			                        ? Qt::TopLeftCorner
+			                        : Qt::TopRightCorner);
+		}
 		shortcutLauncher->setVisible(runtimeConfig.shortcutLauncherVisible &&
 		                             runtimeConfig.shortcutsEnabled);
 
@@ -250,7 +293,9 @@ namespace Secretary::Madt::Gui {
 		std::vector<BrowserPage*> pages;
 		pages.reserve(list.size());
 		for (const auto& entry : list) {
-			pages.push_back(entry.second);
+			if (!isExtraPage(entry.second)) {
+				pages.push_back(entry.second);
+			}
 		}
 		std::sort(pages.begin(), pages.end(), [](const BrowserPage* left, const BrowserPage* right) {
 			if (left->logicalPos != right->logicalPos) {
@@ -446,7 +491,7 @@ namespace Secretary::Madt::Gui {
 	void Browser::updatePageIndex(BrowserPage* page)
 	{
 		if (page != nullptr) {
-			page->index = indexOf(page->view);
+			page->index = isExtraPage(page) || tabs == nullptr ? -1 : tabs->indexOf(page->view);
 		}
 	}
 
@@ -461,12 +506,12 @@ namespace Secretary::Madt::Gui {
 			return;
 		}
 
-		setTabText(page->index,
-		           runtimeConfig.tabBarShowLabels ? QString::number(page->logicalPos + 1)
-		                                          : QString());
-		setTabToolTip(page->index,
-		              runtimeConfig.tabBarShowTooltips ? QString::fromStdString(page->url)
-		                                               : QString());
+		tabs->setTabText(page->index,
+		                 runtimeConfig.tabBarShowLabels ? QString::number(page->logicalPos + 1)
+		                                                : QString());
+		tabs->setTabToolTip(page->index,
+		                    runtimeConfig.tabBarShowTooltips ? QString::fromStdString(page->url)
+		                                                     : QString());
 	}
 
 	void Browser::applyPageIcon(BrowserPage* page)
@@ -480,8 +525,8 @@ namespace Secretary::Madt::Gui {
 			return;
 		}
 
-		setTabIcon(page->index, page->icon);
-		tabBar()->setTabTextColor(page->index, palette().color(QPalette::WindowText));
+		tabs->setTabIcon(page->index, page->icon);
+		tabs->tabBar()->setTabTextColor(page->index, palette().color(QPalette::WindowText));
 	}
 
 	void Browser::stopBlink(BrowserPage* page)
@@ -495,15 +540,64 @@ namespace Secretary::Madt::Gui {
 		applyPageIcon(page);
 	}
 
+	bool Browser::isExtraPage(const BrowserPage* page) const
+	{
+		return page != nullptr && page->preferredPos == POS_EXTRA;
+	}
+
+	int Browser::normalPageCount() const
+	{
+		int count = 0;
+		for (const auto& entry : list) {
+			if (!isExtraPage(entry.second)) {
+				++count;
+			}
+		}
+		return count;
+	}
+
+	int Browser::extraPageCount() const
+	{
+		int count = 0;
+		for (const auto& entry : list) {
+			if (isExtraPage(entry.second)) {
+				++count;
+			}
+		}
+		return count;
+	}
+
+	void Browser::setCurrentExtraPage(BrowserPage* page)
+	{
+		if (!isExtraPage(page) || extraStack == nullptr) {
+			return;
+		}
+
+		extraStack->setCurrentWidget(page->view);
+		updateExtraZoneVisibility();
+		page->view->show();
+		page->view->raise();
+		page->view->update();
+	}
+
+	void Browser::updateExtraZoneVisibility()
+	{
+		if (extraFrame == nullptr || extraStack == nullptr) {
+			return;
+		}
+
+		extraFrame->setVisible(runtimeConfig.extraZoneAlwaysVisible || extraStack->count() > 0);
+	}
+
 	void Browser::syncTabOrder()
 	{
 		auto pages = pagesInDisplayOrder();
 		for (std::size_t i = 0; i < pages.size(); ++i) {
 			BrowserPage* page = pages[i];
-			const int currentIndex = indexOf(page->view);
+			const int currentIndex = tabs->indexOf(page->view);
 			const int targetIndex  = static_cast<int>(i);
 			if (currentIndex >= 0 && currentIndex != targetIndex) {
-				tabBar()->moveTab(currentIndex, targetIndex);
+				tabs->tabBar()->moveTab(currentIndex, targetIndex);
 			}
 		}
 		for (BrowserPage* page : pages) {
@@ -581,7 +675,7 @@ namespace Secretary::Madt::Gui {
 
 	bool Browser::allocateLogicalPosition(BrowserPage* page)
 	{
-		if (static_cast<int>(list.size()) > MAX_TABS) {
+		if (!isExtraPage(page) && normalPageCount() > MAX_TABS) {
 			return false;
 		}
 
@@ -599,7 +693,8 @@ namespace Secretary::Madt::Gui {
 			case POS_END:
 				return allocateZonePosition(page, page->preferredPos);
 			case POS_EXTRA:
-				return false;
+				page->logicalPos = POS_EXTRA;
+				return true;
 			default:
 				return allocateAbsolutePosition(page);
 		}
@@ -635,10 +730,15 @@ namespace Secretary::Madt::Gui {
 	                          CmdResponse*       resp)
 	{
 		CmdResponse::ResultCode result = CmdResponse::ResultCode::EXEC_ERROR;
-		if (static_cast<int>(list.size()) >= MAX_TABS) {
+		const bool              extraPage = preferredPos == POS_EXTRA;
+		if (!extraPage && normalPageCount() >= MAX_TABS) {
 			ELOG("No free MADT slot for tab %s", uuid.c_str());
+		} else if (extraPage && extraPageCount() > 0) {
+			ELOG("MADT extra zone is already occupied for tab %s", uuid.c_str());
 		} else {
-			WebView* view = new WebView(this);
+			QWidget* viewParent = extraPage ? static_cast<QWidget*>(extraStack)
+			                                : static_cast<QWidget*>(tabs);
+			WebView* view = new WebView(viewParent);
 
 			BrowserPage* page  = new BrowserPage;
 			page->url          = url;
@@ -658,10 +758,9 @@ namespace Secretary::Madt::Gui {
 				delete page->view;
 				delete page;
 				list.erase(uuid);
-				} else {
-					view->setUrl(QUrl(QString::fromStdString(url)));
-					page->index = addTab(view, QString());
-					page->blinkTimer->setInterval(BLINK_RATE_MS);
+			} else {
+				view->setUrl(QUrl(QString::fromStdString(url)));
+				page->blinkTimer->setInterval(BLINK_RATE_MS);
 				connect(page->blinkTimer, &QTimer::timeout, this, [this, uuid]() {
 					const auto it = list.find(uuid);
 					if (it == list.end()) {
@@ -669,6 +768,11 @@ namespace Secretary::Madt::Gui {
 					}
 
 					BrowserPage* page = it->second;
+					if (isExtraPage(page)) {
+						page->blinkTimer->stop();
+						return;
+					}
+
 					updatePageIndex(page);
 					if (page->index < 0) {
 						page->blinkTimer->stop();
@@ -677,27 +781,33 @@ namespace Secretary::Madt::Gui {
 
 					page->blinkVisible = !page->blinkVisible;
 					if (page->blinkVisible) {
-						setTabIcon(page->index, page->icon);
-						tabBar()->setTabTextColor(page->index, palette().color(QPalette::WindowText));
+						tabs->setTabIcon(page->index, page->icon);
+						tabs->tabBar()->setTabTextColor(page->index, palette().color(QPalette::WindowText));
 					} else {
-						setTabIcon(page->index, makeBlankIcon(tabBar()->iconSize()));
-						tabBar()->setTabTextColor(page->index, QColor(Qt::red));
+						tabs->setTabIcon(page->index, makeBlankIcon(tabs->tabBar()->iconSize()));
+						tabs->tabBar()->setTabTextColor(page->index, QColor(Qt::red));
 					}
 				});
 
-				syncTabOrder();
-				const bool firstTab = (list.size() == 1);
-				if (firstTab) {
-					const int targetIndex = indexOf(view);
-					if (targetIndex >= 0) {
-						page->index = targetIndex;
-						setCurrentIndex(targetIndex);
-					}
-					view->show();
-					view->raise();
-					view->update();
+				if (extraPage) {
+					extraStack->addWidget(view);
+					setCurrentExtraPage(page);
 				} else {
-					view->hide();
+					page->index = tabs->addTab(view, QString());
+					syncTabOrder();
+					const bool firstTab = (normalPageCount() == 1);
+					if (firstTab) {
+						const int targetIndex = tabs->indexOf(view);
+						if (targetIndex >= 0) {
+							page->index = targetIndex;
+							tabs->setCurrentIndex(targetIndex);
+						}
+						view->show();
+						view->raise();
+						view->update();
+					} else {
+						view->hide();
+					}
 				}
 
 				if (!iconUrl.empty()) {
@@ -740,19 +850,23 @@ namespace Secretary::Madt::Gui {
 				if (list.count(uuid) > 0) {
 					BrowserPage* page         = list[uuid];
 					WebView*      view         = page->view;
-					WebView*      previousView = qobject_cast<WebView*>(currentWidget());
-					const int     targetIndex  = indexOf(view);
 					ILOG("url %s", view->url().toString().toStdString().c_str());
-					if (previousView != nullptr && previousView != view)
-						previousView->hide();
-					if (targetIndex >= 0) {
-						page->index = targetIndex;
-						setCurrentIndex(targetIndex);
+					if (isExtraPage(page)) {
+						setCurrentExtraPage(page);
+					} else {
+						WebView*  previousView = qobject_cast<WebView*>(currentWidget());
+						const int targetIndex  = tabs->indexOf(view);
+						if (previousView != nullptr && previousView != view)
+							previousView->hide();
+						if (targetIndex >= 0) {
+							page->index = targetIndex;
+							tabs->setCurrentIndex(targetIndex);
+						}
+						view->show();
+						view->raise();
+						view->update();
 					}
 					stopBlink(page);
-					view->show();
-					view->raise();
-					view->update();
 					resp->result = CmdResponse::ResultCode::OK;
 				} else {
 					resp->result = CmdResponse::ResultCode::TAB_NOT_FOUND;
@@ -775,9 +889,11 @@ namespace Secretary::Madt::Gui {
 					page->url         = url;
 					page->view->setUrl(QUrl(QString::fromStdString(url)));
 					applyPageLabel(page);
-					if ((page->preferredPos == POS_BEGINNING || page->preferredPos == POS_MIDDLE ||
-					     page->preferredPos == POS_END) &&
-					    allocateZonePosition(page, page->preferredPos)) {
+					if (isExtraPage(page)) {
+						setCurrentExtraPage(page);
+					} else if ((page->preferredPos == POS_BEGINNING || page->preferredPos == POS_MIDDLE ||
+					            page->preferredPos == POS_END) &&
+					           allocateZonePosition(page, page->preferredPos)) {
 						syncTabOrder();
 					}
 					resp->result = CmdResponse::ResultCode::OK;
@@ -824,16 +940,23 @@ namespace Secretary::Madt::Gui {
 		try {
 			if (list.count(uuid) > 0) {
 				BrowserPage* page  = list[uuid];
-				const int    index = indexOf(page->view);
 				stopBlink(page);
-				if (index >= 0) {
-					removeTab(index);
+				if (isExtraPage(page)) {
+					if (extraStack != nullptr) {
+						extraStack->removeWidget(page->view);
+					}
+				} else {
+					const int index = tabs->indexOf(page->view);
+					if (index >= 0) {
+						tabs->removeTab(index);
+					}
 				}
 				delete page->blinkTimer;
 				delete page->view;
 				delete page;
 				list.erase(uuid);
 				syncTabOrder();
+				updateExtraZoneVisibility();
 				ret = CmdResponse::ResultCode::OK;
 			} else {
 				ret = CmdResponse::ResultCode::TAB_NOT_FOUND;
@@ -855,15 +978,20 @@ namespace Secretary::Madt::Gui {
 		try {
 			if (list.count(uuid) > 0) {
 				BrowserPage* page = list[uuid];
-				updatePageIndex(page);
-				if (page->index >= 0) {
-					if (currentWidget() != page->view) {
-						page->blinkVisible = true;
-						page->blinkTimer->start();
-					}
+				if (isExtraPage(page)) {
+					setCurrentExtraPage(page);
 					ret = CmdResponse::ResultCode::OK;
 				} else {
-					ret = CmdResponse::ResultCode::TAB_NOT_FOUND;
+					updatePageIndex(page);
+					if (page->index >= 0) {
+						if (currentWidget() != page->view) {
+							page->blinkVisible = true;
+							page->blinkTimer->start();
+						}
+						ret = CmdResponse::ResultCode::OK;
+					} else {
+						ret = CmdResponse::ResultCode::TAB_NOT_FOUND;
+					}
 				}
 			} else {
 				ret = CmdResponse::ResultCode::TAB_NOT_FOUND;

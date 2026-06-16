@@ -9,8 +9,10 @@
 #include <QtCore/QTimer>
 #include <QtWidgets/QFrame>
 #include <QtWidgets/QGridLayout>
+#include <QtWidgets/QStackedWidget>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QToolButton>
+#include <QtWidgets/QWidget>
 #if defined(USE_WEBENGINEVIEW)
 #include <QtWebEngineWidgets/QWebEngineView>
 #define QPAGE QWebEnginePage
@@ -68,12 +70,13 @@ namespace Secretary::Madt::Gui {
 		QIcon       icon;
 	};
 
-	class Browser : public QTabWidget
+	class Browser : public QWidget
 	{
 		Q_OBJECT
 	  public:
 		explicit Browser(const RuntimeConfig& runtimeConfig, QWidget* parent = nullptr);
 		~Browser();
+		QWidget* currentWidget() const;
 
 	  signals:
 		void signalNewWebTab(const std::string& url,
@@ -145,6 +148,11 @@ namespace Secretary::Madt::Gui {
 		void updatePageIndex(BrowserPage* page);
 		void applyPageLabel(BrowserPage* page);
 		void syncTabOrder();
+		bool isExtraPage(const BrowserPage* page) const;
+		int  normalPageCount() const;
+		int  extraPageCount() const;
+		void setCurrentExtraPage(BrowserPage* page);
+		void updateExtraZoneVisibility();
 		bool allocateLogicalPosition(BrowserPage* page);
 		bool allocateAbsolutePosition(BrowserPage* page);
 		bool allocateZonePosition(BrowserPage* page, int preferredPos);
@@ -166,6 +174,9 @@ namespace Secretary::Madt::Gui {
 		IconLoader                       iconLoader;
 		std::map<std::string, BrowserPage*> list;
 		std::map<std::string, ShortcutEntry*> shortcuts;
+		QTabWidget*                      tabs             = nullptr;
+		QFrame*                          extraFrame       = nullptr;
+		QStackedWidget*                  extraStack       = nullptr;
 		QToolButton*                     shortcutLauncher = nullptr;
 		QFrame*                          shortcutPopup    = nullptr;
 		QGridLayout*                     shortcutLayout   = nullptr;
