@@ -71,7 +71,6 @@ Currently supported keys:
 - `tabBarUseScrollButtons`: enable or disable scroll buttons on the tab bar
 - `extraZoneHeight`: extra zone height in pixels
 - `extraZoneEdge`: one of `top`, `bottom`
-- `extraZoneAlwaysVisible`: reserve the extra zone even when it has no page
 - `shortcutsEnabled`: globally enable shortcut support
 - `shortcutLauncherVisible`: show or hide the shortcut launcher button
 - `shortcutLauncherLabel`: text displayed on the launcher button
@@ -97,7 +96,6 @@ If the tab bar keys are omitted, the standalone defaults are:
 - `tabBarHeight=48`
 - `extraZoneHeight=160`
 - `extraZoneEdge=top`
-- `extraZoneAlwaysVisible=false`
 
 ## Conformance Testing
 

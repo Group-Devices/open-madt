@@ -586,7 +586,7 @@ namespace Secretary::Madt::Gui {
 			return;
 		}
 
-		extraFrame->setVisible(runtimeConfig.extraZoneAlwaysVisible || extraStack->count() > 0);
+		extraFrame->setVisible(extraStack->count() > 0);
 	}
 
 	void Browser::syncTabOrder()

@@ -409,7 +409,6 @@ namespace Secretary::Madt {
 		loadOptionalBool(document, "shortcutAutoClose", config.shortcutAutoClose);
 		loadOptionalInt(document, "extraZoneHeight", config.extraZoneHeight, 1, 1024);
 		loadExtraZoneEdge(document, config);
-		loadOptionalBool(document, "extraZoneAlwaysVisible", config.extraZoneAlwaysVisible);
 		loadSettings(document, config);
 		return config;
 	}

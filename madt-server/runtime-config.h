@@ -79,7 +79,6 @@ namespace Secretary::Madt {
 		bool                   shortcutAutoClose       = true;
 		int                    extraZoneHeight         = 160;
 		ExtraZoneEdge          extraZoneEdge           = ExtraZoneEdge::Top;
-		bool                   extraZoneAlwaysVisible  = false;
 		SettingsState settings;
 	};
 
