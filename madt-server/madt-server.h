@@ -75,11 +75,13 @@ namespace Secretary::Madt {
 		void rememberOwnedTab(struct bufferevent* bev, const std::string& tabId);
 		void forgetOwnedTab(const std::string& tabId);
 		bool hasTab(const std::string& tabId) const;
+		bool isExtraTab(const std::string& tabId) const;
 		bool isTabLifetimeByConnection() const { return runtimeConfig.tabLifetimeByConnection; }
 
 	  private:
 		requestCode convertStringToMadtRequest(const std::string& str);
 		returnCode  convertGuiResultToMadt(Gui::CmdResponse::ResultCode guiCode);
+		returnCode  killTabInternal(const std::string& tabId, bool forceDestroy);
 		void        sendResponse(struct bufferevent* bev, const json& response);
 		void        handleGetInfo(struct bufferevent* bev);
 		void        handleGetRandom(struct bufferevent* bev);
@@ -129,6 +131,7 @@ namespace Secretary::Madt {
 		std::map<std::string, ControlNonce>                                      controlNonces;
 		std::map<struct bufferevent*, std::set<std::string>>                        connectionTabs;
 		std::map<struct bufferevent*, std::string>                                  connectionBuffers;
+		std::string                                                                 extraTabId;
 	};
 
 }

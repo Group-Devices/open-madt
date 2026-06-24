@@ -128,21 +128,14 @@ namespace Secretary::Madt::Gui {
 		extraFrame->setStyleSheet(QStringLiteral("#extraZone { background-color: #ffffff; %1 }")
 		                            .arg(extraZoneBorder));
 
-		auto* extraLayout = new QVBoxLayout(extraFrame);
+		extraLayout = new QVBoxLayout(extraFrame);
 		extraLayout->setContentsMargins(0, 0, 0, 0);
 		extraLayout->setSpacing(0);
 
-		extraStack = new QStackedWidget(extraFrame);
-		extraLayout->addWidget(extraStack);
-
 		tabs = new QTabWidget(this);
-		if (runtimeConfig.extraZoneEdge == ExtraZoneEdge::Top) {
-			layout->addWidget(extraFrame);
-			layout->addWidget(tabs, 1);
-		} else {
-			layout->addWidget(tabs, 1);
-			layout->addWidget(extraFrame);
-		}
+		layout->addWidget(tabs, 1);
+		extraFrame->hide();
+		positionExtraZoneOverlay();
 
 		applyRuntimeConfig();
 		setupShortcutUi();
@@ -171,9 +164,9 @@ namespace Secretary::Madt::Gui {
 		        SLOT(onNavigateTo(const std::string&, const std::string&, CmdResponse*)));
 		connect(this, SIGNAL(signalGetTabMap(CmdResponse*)), this, SLOT(onGetTabMap(CmdResponse*)));
 		connect(this,
-		        SIGNAL(signalKillTab(const std::string&, CmdResponse*)),
+		        SIGNAL(signalKillTab(const std::string&, CmdResponse*, bool)),
 		        this,
-		        SLOT(onKillTab(const std::string&, CmdResponse*)));
+		        SLOT(onKillTab(const std::string&, CmdResponse*, bool)));
 		connect(this,
 		        SIGNAL(signalBlinkTab(const std::string&, CmdResponse*)),
 		        this,
@@ -215,6 +208,12 @@ namespace Secretary::Madt::Gui {
 	QWidget* Browser::currentWidget() const
 	{
 		return tabs != nullptr ? tabs->currentWidget() : nullptr;
+	}
+
+	void Browser::resizeEvent(QResizeEvent* event)
+	{
+		QWidget::resizeEvent(event);
+		positionExtraZoneOverlay();
 	}
 
 	void Browser::applyRuntimeConfig()
@@ -545,6 +544,16 @@ namespace Secretary::Madt::Gui {
 		return page != nullptr && page->preferredPos == POS_EXTRA;
 	}
 
+	bool Browser::hasExtraPage() const
+	{
+		for (const auto& entry : list) {
+			if (isExtraPage(entry.second)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	int Browser::normalPageCount() const
 	{
 		int count = 0;
@@ -556,37 +565,51 @@ namespace Secretary::Madt::Gui {
 		return count;
 	}
 
-	int Browser::extraPageCount() const
+	void Browser::positionExtraZoneOverlay()
 	{
-		int count = 0;
-		for (const auto& entry : list) {
-			if (isExtraPage(entry.second)) {
-				++count;
-			}
-		}
-		return count;
-	}
-
-	void Browser::setCurrentExtraPage(BrowserPage* page)
-	{
-		if (!isExtraPage(page) || extraStack == nullptr) {
+		if (extraFrame == nullptr) {
 			return;
 		}
 
-		extraStack->setCurrentWidget(page->view);
-		updateExtraZoneVisibility();
-		page->view->show();
-		page->view->raise();
-		page->view->update();
+		const int overlayHeight = std::max(1, runtimeConfig.extraZoneHeight);
+		const int overlayY =
+		  runtimeConfig.extraZoneEdge == ExtraZoneEdge::Bottom ? std::max(0, height() - overlayHeight)
+		                                                       : 0;
+		extraFrame->setGeometry(0, overlayY, width(), overlayHeight);
+	}
+
+	void Browser::showExtraZoneOverlay()
+	{
+		if (extraFrame == nullptr || !hasExtraPage()) {
+			return;
+		}
+
+		positionExtraZoneOverlay();
+		extraFrame->show();
+		extraFrame->raise();
+		extraFrame->update();
+	}
+
+	void Browser::hideExtraZoneOverlay()
+	{
+		if (extraFrame != nullptr) {
+			extraFrame->hide();
+		}
 	}
 
 	void Browser::updateExtraZoneVisibility()
 	{
-		if (extraFrame == nullptr || extraStack == nullptr) {
+		if (extraFrame == nullptr) {
 			return;
 		}
 
-		extraFrame->setVisible(extraStack->count() > 0);
+		if (!hasExtraPage()) {
+			hideExtraZoneOverlay();
+		} else if (extraFrame->isVisible()) {
+			showExtraZoneOverlay();
+		} else {
+			positionExtraZoneOverlay();
+		}
 	}
 
 	void Browser::syncTabOrder()
@@ -733,10 +756,10 @@ namespace Secretary::Madt::Gui {
 		const bool              extraPage = preferredPos == POS_EXTRA;
 		if (!extraPage && normalPageCount() >= MAX_TABS) {
 			ELOG("No free MADT slot for tab %s", uuid.c_str());
-		} else if (extraPage && extraPageCount() > 0) {
+		} else if (extraPage && hasExtraPage()) {
 			ELOG("MADT extra zone is already occupied for tab %s", uuid.c_str());
 		} else {
-			QWidget* viewParent = extraPage ? static_cast<QWidget*>(extraStack)
+			QWidget* viewParent = extraPage ? static_cast<QWidget*>(extraFrame)
 			                                : static_cast<QWidget*>(tabs);
 			WebView* view = new WebView(viewParent);
 
@@ -790,8 +813,8 @@ namespace Secretary::Madt::Gui {
 				});
 
 				if (extraPage) {
-					extraStack->addWidget(view);
-					setCurrentExtraPage(page);
+					extraLayout->addWidget(view);
+					updateExtraZoneVisibility();
 				} else {
 					page->index = tabs->addTab(view, QString());
 					syncTabOrder();
@@ -852,7 +875,7 @@ namespace Secretary::Madt::Gui {
 					WebView*      view         = page->view;
 					ILOG("url %s", view->url().toString().toStdString().c_str());
 					if (isExtraPage(page)) {
-						setCurrentExtraPage(page);
+						showExtraZoneOverlay();
 					} else {
 						WebView*  previousView = qobject_cast<WebView*>(currentWidget());
 						const int targetIndex  = tabs->indexOf(view);
@@ -890,7 +913,7 @@ namespace Secretary::Madt::Gui {
 					page->view->setUrl(QUrl(QString::fromStdString(url)));
 					applyPageLabel(page);
 					if (isExtraPage(page)) {
-						setCurrentExtraPage(page);
+						updateExtraZoneVisibility();
 					} else if ((page->preferredPos == POS_BEGINNING || page->preferredPos == POS_MIDDLE ||
 					            page->preferredPos == POS_END) &&
 					           allocateZonePosition(page, page->preferredPos)) {
@@ -934,30 +957,39 @@ namespace Secretary::Madt::Gui {
 		}
 	}
 
-	void Browser::onKillTab(const std::string& uuid, CmdResponse* resp)
+	void Browser::onKillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy)
 	{
 		CmdResponse::ResultCode ret;
 		try {
 			if (list.count(uuid) > 0) {
 				BrowserPage* page  = list[uuid];
 				stopBlink(page);
-				if (isExtraPage(page)) {
-					if (extraStack != nullptr) {
-						extraStack->removeWidget(page->view);
+				const bool extraPage = isExtraPage(page);
+				if (extraPage && !forceDestroy) {
+					hideExtraZoneOverlay();
+					ret = CmdResponse::ResultCode::OK;
+				} else if (extraPage) {
+					if (extraLayout != nullptr) {
+						extraLayout->removeWidget(page->view);
 					}
+					delete page->blinkTimer;
+					delete page->view;
+					delete page;
+					list.erase(uuid);
+					updateExtraZoneVisibility();
+					ret = CmdResponse::ResultCode::OK;
 				} else {
 					const int index = tabs->indexOf(page->view);
 					if (index >= 0) {
 						tabs->removeTab(index);
 					}
+					delete page->blinkTimer;
+					delete page->view;
+					delete page;
+					list.erase(uuid);
+					syncTabOrder();
+					ret = CmdResponse::ResultCode::OK;
 				}
-				delete page->blinkTimer;
-				delete page->view;
-				delete page;
-				list.erase(uuid);
-				syncTabOrder();
-				updateExtraZoneVisibility();
-				ret = CmdResponse::ResultCode::OK;
 			} else {
 				ret = CmdResponse::ResultCode::TAB_NOT_FOUND;
 			}
@@ -979,7 +1011,7 @@ namespace Secretary::Madt::Gui {
 			if (list.count(uuid) > 0) {
 				BrowserPage* page = list[uuid];
 				if (isExtraPage(page)) {
-					setCurrentExtraPage(page);
+					showExtraZoneOverlay();
 					ret = CmdResponse::ResultCode::OK;
 				} else {
 					updatePageIndex(page);
@@ -1141,9 +1173,9 @@ namespace Secretary::Madt::Gui {
 		emit signalGetTabMap(resp);
 	}
 
-	void Browser::KillTab(const std::string& uuid, CmdResponse* resp)
+	void Browser::KillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy)
 	{
-		emit signalKillTab(uuid, resp);
+		emit signalKillTab(uuid, resp, forceDestroy);
 	}
 
 	void Browser::BlinkTab(const std::string& uuid, CmdResponse* resp)

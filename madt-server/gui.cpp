@@ -203,10 +203,10 @@ namespace Secretary::Madt::Gui {
 		return ret;
 	}
 
-	bool KillTab(const std::string& uuid, CmdResponse* resp)
+	bool KillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy)
 	{
 		if (browser)
-			browser->KillTab(uuid, resp);
+			browser->KillTab(uuid, resp, forceDestroy);
 		return (browser != nullptr);
 	}
 

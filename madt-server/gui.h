@@ -39,7 +39,7 @@ namespace Secretary::Madt::Gui {
 	               int                flags,
 	               const std::string& uuid,
 	               CmdResponse*       resp);
-	bool KillTab(const std::string& uuid, CmdResponse* resp);
+	bool KillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy);
 	bool ActivateTab(const std::string& uuid, CmdResponse* resp);
 	bool NavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 	bool GetCharacteristics(CmdResponse* resp);

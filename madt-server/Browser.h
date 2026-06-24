@@ -9,7 +9,6 @@
 #include <QtCore/QTimer>
 #include <QtWidgets/QFrame>
 #include <QtWidgets/QGridLayout>
-#include <QtWidgets/QStackedWidget>
 #include <QtWidgets/QTabWidget>
 #include <QtWidgets/QToolButton>
 #include <QtWidgets/QWidget>
@@ -26,6 +25,9 @@
 #include "IconLoader.h"
 #include "gui.h"
 #include "runtime-config.h"
+
+class QResizeEvent;
+class QVBoxLayout;
 
 namespace Secretary::Madt::Gui {
 	class CustomPage : public QPAGE
@@ -88,7 +90,7 @@ namespace Secretary::Madt::Gui {
 		void signalActivateTab(const std::string& uuid, CmdResponse* resp);
 		void signalNavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 		void signalGetTabMap(CmdResponse* resp);
-		void signalKillTab(const std::string& uuid, CmdResponse* resp);
+		void signalKillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy);
 		void signalBlinkTab(const std::string& uuid, CmdResponse* resp);
 		void signalNewShortcut(const std::string& url,
 		                       const std::string& iconUrl,
@@ -109,7 +111,7 @@ namespace Secretary::Madt::Gui {
 		void onActivateTab(const std::string& uuid, CmdResponse* resp);
 		void onNavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 		void onGetTabMap(CmdResponse* resp);
-		void onKillTab(const std::string& uuid, CmdResponse* resp);
+		void onKillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy);
 		void onBlinkTab(const std::string& uuid, CmdResponse* resp);
 		void onNewShortcut(const std::string& url,
 		                   const std::string& iconUrl,
@@ -130,7 +132,7 @@ namespace Secretary::Madt::Gui {
 		void ActivateTab(const std::string& uuid, CmdResponse* resp);
 		void NavigateTo(const std::string& uuid, const std::string& url, CmdResponse* resp);
 		void GetTabMap(CmdResponse* resp);
-		void KillTab(const std::string& uuid, CmdResponse* resp);
+		void KillTab(const std::string& uuid, CmdResponse* resp, bool forceDestroy);
 		void BlinkTab(const std::string& uuid, CmdResponse* resp);
 		void NewShortcut(const std::string& url,
 		                 const std::string& iconUrl,
@@ -142,6 +144,7 @@ namespace Secretary::Madt::Gui {
 		void GetShortcuts(CmdResponse* resp);
 
 	  private:
+		void resizeEvent(QResizeEvent* event) override;
 		void applyRuntimeConfig();
 		void applyPageIcon(BrowserPage* page);
 		void stopBlink(BrowserPage* page);
@@ -149,9 +152,11 @@ namespace Secretary::Madt::Gui {
 		void applyPageLabel(BrowserPage* page);
 		void syncTabOrder();
 		bool isExtraPage(const BrowserPage* page) const;
+		bool hasExtraPage() const;
 		int  normalPageCount() const;
-		int  extraPageCount() const;
-		void setCurrentExtraPage(BrowserPage* page);
+		void positionExtraZoneOverlay();
+		void showExtraZoneOverlay();
+		void hideExtraZoneOverlay();
 		void updateExtraZoneVisibility();
 		bool allocateLogicalPosition(BrowserPage* page);
 		bool allocateAbsolutePosition(BrowserPage* page);
@@ -176,7 +181,7 @@ namespace Secretary::Madt::Gui {
 		std::map<std::string, ShortcutEntry*> shortcuts;
 		QTabWidget*                      tabs             = nullptr;
 		QFrame*                          extraFrame       = nullptr;
-		QStackedWidget*                  extraStack       = nullptr;
+		QVBoxLayout*                     extraLayout      = nullptr;
 		QToolButton*                     shortcutLauncher = nullptr;
 		QFrame*                          shortcutPopup    = nullptr;
 		QGridLayout*                     shortcutLayout   = nullptr;
