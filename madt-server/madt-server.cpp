@@ -44,6 +44,7 @@ namespace Secretary::Madt {
 		constexpr int         HAS_SOUND        = 1;
 		constexpr int         LEASE_CHECK_MS   = 1000;
 		constexpr int         FLAG_APPEND_ID   = 1;
+		constexpr int         POS_EXTRA        = -10;
 		constexpr int         TXT_VERSION      = 1;
 		constexpr unsigned int SOUNDFLAG_ASYNC      = 0x00000001U;
 		constexpr unsigned int SOUNDFLAG_NODEFAULT  = 0x00000002U;
@@ -242,6 +243,9 @@ namespace Secretary::Madt {
 		}
 
 		tabLeases.erase(tabId);
+		if (extraTabId == tabId) {
+			extraTabId.clear();
+		}
 		for (auto it = connectionTabs.begin(); it != connectionTabs.end();) {
 			it->second.erase(tabId);
 			if (it->second.empty()) {
@@ -265,6 +269,28 @@ namespace Secretary::Madt {
 		return tabLeases.find(tabId) != tabLeases.end();
 	}
 
+	bool Server::isExtraTab(const std::string& tabId) const
+	{
+		return !tabId.empty() && tabId == extraTabId;
+	}
+
+	Server::returnCode Server::killTabInternal(const std::string& tabId, bool forceDestroy)
+	{
+		Gui::CmdResponse gResp;
+		const bool       retcode = Gui::KillTab(tabId, &gResp, forceDestroy);
+		if (!retcode) {
+			return returnCode::MTSRC_EXEC_ERROR;
+		}
+
+		std::unique_lock<std::mutex> lock(gResp.mtx);
+		gResp.cv.wait(lock, [&gResp] { return gResp.ready; });
+		const returnCode result = convertGuiResultToMadt(gResp.result);
+		if (gResp.result == Gui::CmdResponse::ResultCode::OK && forceDestroy) {
+			forgetOwnedTab(tabId);
+		}
+		return result;
+	}
+
 	void Server::eraseOwnedTabs(struct bufferevent* bev)
 	{
 		if (!runtimeConfig.tabLifetimeByConnection || bev == nullptr) {
@@ -282,7 +308,7 @@ namespace Secretary::Madt {
 				continue;
 			}
 
-			Gui::KillTab(tabId, nullptr);
+			Gui::KillTab(tabId, nullptr, true);
 			forgetOwnedTab(tabId);
 		}
 	}
@@ -623,7 +649,7 @@ namespace Secretary::Madt {
 
 		for (const auto& tabId : expiredTabs) {
 			ILOG("Lease expired for tab %s", tabId.c_str());
-			Gui::KillTab(tabId, nullptr);
+			Gui::KillTab(tabId, nullptr, true);
 			forgetOwnedTab(tabId);
 		}
 
@@ -822,7 +848,9 @@ namespace Secretary::Madt {
 				return;
 			}
 			if (ttl == 0) {
-				handleKillTab(bev, json{ { "tabId", tabId } });
+				json response;
+				response["retCode"] = killTabInternal(tabId, true);
+				sendResponse(bev, response);
 				return;
 			}
 
@@ -968,6 +996,9 @@ namespace Secretary::Madt {
 		if (response["retCode"].get<int>() == static_cast<int>(returnCode::MTSRC_OK)) {
 			response["tabId"] = uuid;
 			rememberOwnedTab(bev, uuid);
+			if (preferredPos == POS_EXTRA) {
+				extraTabId = uuid;
+			}
 		}
 		sendResponse(bev, response);
 	}
@@ -1031,18 +1062,9 @@ namespace Secretary::Madt {
 	void Server::handleKillTab(struct bufferevent* bev, const json& request)
 	{
 		json             response;
-		Gui::CmdResponse gResp;
-		const bool       retcode = Gui::KillTab(request["tabId"], &gResp);
-		if (retcode) {
-			std::unique_lock<std::mutex> lock(gResp.mtx);
-			gResp.cv.wait(lock, [&gResp] { return gResp.ready; });
-			response["retCode"] = convertGuiResultToMadt(gResp.result);
-			if (gResp.result == Gui::CmdResponse::ResultCode::OK) {
-				forgetOwnedTab(request["tabId"].get<std::string>());
-			}
-		} else {
-			response["retCode"] = returnCode::MTSRC_EXEC_ERROR;
-		}
+		const std::string tabId    = request["tabId"].get<std::string>();
+		const bool        extraTab = isExtraTab(tabId);
+		response["retCode"] = killTabInternal(tabId, !extraTab);
 		sendResponse(bev, response);
 	}
 

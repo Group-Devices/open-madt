@@ -69,6 +69,11 @@ Currently supported keys:
 - `tabBarShowLabels`: show the numeric tab labels
 - `tabBarShowTooltips`: show the tab URL as tooltip text
 - `tabBarUseScrollButtons`: enable or disable scroll buttons on the tab bar
+- `extraZonePlacement`: one of `top`, `bottom`, `free`
+- `extraZoneHeight`: extra zone height in pixels for `top` / `bottom`;
+  ignored when `extraZonePlacement` is `free`
+- `extraZoneRect`: rectangle used when `extraZonePlacement` is `free`, with
+  `x`, `y`, `width`, and `height` in pixels; ignored for `top` / `bottom`
 - `shortcutsEnabled`: globally enable shortcut support
 - `shortcutLauncherVisible`: show or hide the shortcut launcher button
 - `shortcutLauncherLabel`: text displayed on the launcher button
@@ -87,11 +92,14 @@ Currently supported keys:
 If `tabLifetimeByConnection` is omitted, the standalone `open-madt` default is
 `false`.
 
-If the tab bar keys are omitted, the standalone defaults are:
+If the tab bar and extra zone keys are omitted, the standalone defaults are:
 - `tabBarVisible=true`
 - `tabBarEdge=top`
 - `tabBarWidth=96`
 - `tabBarHeight=48`
+- `extraZonePlacement=top`
+- `extraZoneHeight=160`
+- `extraZoneRect={ "x": 0, "y": 0, "width": 640, "height": 160 }`
 
 ## Conformance Testing
 

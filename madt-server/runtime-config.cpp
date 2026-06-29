@@ -8,6 +8,7 @@
 namespace Secretary::Madt {
 	namespace {
 		constexpr const char* CONFIG_FILENAME = "madt-config.json";
+		constexpr int         MAX_EXTRA_ZONE_DIMENSION = 7680;
 
 		bool isValidMode(const std::string& value,
 		                 const std::initializer_list<const char*>& allowed)
@@ -152,6 +153,83 @@ namespace Secretary::Madt {
 				     CONFIG_FILENAME,
 				     corner.c_str());
 			}
+		}
+
+		void loadExtraZonePlacement(const json& document, RuntimeConfig& config)
+		{
+			const auto placementIt = document.find("extraZonePlacement");
+			if (placementIt == document.end() || placementIt->is_null()) {
+				return;
+			}
+			if (!placementIt->is_string()) {
+				ELOG("MADT configuration %s has non-string extraZonePlacement", CONFIG_FILENAME);
+				return;
+			}
+
+			const auto placement = placementIt->get<std::string>();
+			if (placement == "top") {
+				config.extraZonePlacement = ExtraZonePlacement::Top;
+			} else if (placement == "bottom") {
+				config.extraZonePlacement = ExtraZonePlacement::Bottom;
+			} else if (placement == "free") {
+				config.extraZonePlacement = ExtraZonePlacement::Free;
+			} else {
+				ELOG("MADT configuration %s has invalid extraZonePlacement '%s'",
+				     CONFIG_FILENAME,
+				     placement.c_str());
+			}
+		}
+
+		void loadExtraZoneRect(const json& document, RuntimeConfig& config)
+		{
+			const auto rectIt = document.find("extraZoneRect");
+			if (rectIt == document.end() || rectIt->is_null()) {
+				return;
+			}
+			if (!rectIt->is_object()) {
+				ELOG("MADT configuration %s has non-object extraZoneRect", CONFIG_FILENAME);
+				return;
+			}
+
+			auto loadRectInt = [](const json& rect,
+			                      const char* key,
+			                      int&        destination,
+			                      int         minValue,
+			                      int         maxValue) {
+				const auto valueIt = rect.find(key);
+				if (valueIt == rect.end() || valueIt->is_null()) {
+					return;
+				}
+				if (!valueIt->is_number_integer()) {
+					ELOG("MADT configuration %s has non-integer extraZoneRect.%s",
+					     CONFIG_FILENAME,
+					     key);
+					return;
+				}
+
+				const int value = valueIt->get<int>();
+				if (value < minValue || value > maxValue) {
+					ELOG("MADT configuration %s has out-of-range extraZoneRect.%s=%d",
+					     CONFIG_FILENAME,
+					     key,
+					     value);
+					return;
+				}
+				destination = value;
+			};
+
+			loadRectInt(*rectIt, "x", config.extraZoneRect.x, 0, MAX_EXTRA_ZONE_DIMENSION);
+			loadRectInt(*rectIt, "y", config.extraZoneRect.y, 0, MAX_EXTRA_ZONE_DIMENSION);
+			loadRectInt(*rectIt, "width", config.extraZoneRect.width, 1, MAX_EXTRA_ZONE_DIMENSION);
+			loadRectInt(*rectIt, "height", config.extraZoneRect.height, 1, MAX_EXTRA_ZONE_DIMENSION);
+		}
+
+		void loadExtraZoneGeometry(const json& document, RuntimeConfig& config)
+		{
+			if (config.extraZonePlacement == ExtraZonePlacement::Free)
+				loadExtraZoneRect(document, config);
+			else
+				loadOptionalInt(document, "extraZoneHeight", config.extraZoneHeight, 1, MAX_EXTRA_ZONE_DIMENSION);
 		}
 
 		void loadSettings(const json& document, RuntimeConfig& config)
@@ -384,6 +462,8 @@ namespace Secretary::Madt {
 		loadOptionalInt(document, "shortcutIconHeight", config.shortcutIconHeight, 1, 512);
 		loadOptionalInt(document, "shortcutMaxCount", config.shortcutMaxCount, 1, 20);
 		loadOptionalBool(document, "shortcutAutoClose", config.shortcutAutoClose);
+		loadExtraZonePlacement(document, config);
+		loadExtraZoneGeometry(document, config);
 		loadSettings(document, config);
 		return config;
 	}
