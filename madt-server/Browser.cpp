@@ -83,6 +83,19 @@ namespace Secretary::Madt::Gui {
 					return -1;
 			}
 		}
+
+		QString extraZoneBorderStyle(ExtraZonePlacement placement)
+		{
+			switch (placement) {
+				case ExtraZonePlacement::Bottom:
+					return QStringLiteral("border-top: 1px solid #808080;");
+				case ExtraZonePlacement::Free:
+					return QStringLiteral("border: 1px solid #808080;");
+				case ExtraZonePlacement::Top:
+					return QStringLiteral("border-bottom: 1px solid #808080;");
+			}
+			return QStringLiteral("border-bottom: 1px solid #808080;");
+		}
 	}
 
 	CustomPage::CustomPage(QObject* parent)
@@ -120,13 +133,8 @@ namespace Secretary::Madt::Gui {
 
 		extraFrame = new QFrame(this);
 		extraFrame->setObjectName(QStringLiteral("extraZone"));
-		extraFrame->setFixedHeight(runtimeConfig.extraZoneHeight);
-		const QString extraZoneBorder =
-		  runtimeConfig.extraZoneEdge == ExtraZoneEdge::Bottom
-		    ? QStringLiteral("border-top: 1px solid #808080;")
-		    : QStringLiteral("border-bottom: 1px solid #808080;");
 		extraFrame->setStyleSheet(QStringLiteral("#extraZone { background-color: #ffffff; %1 }")
-		                            .arg(extraZoneBorder));
+		                            .arg(extraZoneBorderStyle(runtimeConfig.extraZonePlacement)));
 
 		extraLayout = new QVBoxLayout(extraFrame);
 		extraLayout->setContentsMargins(0, 0, 0, 0);
@@ -571,11 +579,27 @@ namespace Secretary::Madt::Gui {
 			return;
 		}
 
-		const int overlayHeight = std::max(1, runtimeConfig.extraZoneHeight);
-		const int overlayY =
-		  runtimeConfig.extraZoneEdge == ExtraZoneEdge::Bottom ? std::max(0, height() - overlayHeight)
-		                                                       : 0;
-		extraFrame->setGeometry(0, overlayY, width(), overlayHeight);
+		switch (runtimeConfig.extraZonePlacement) {
+			case ExtraZonePlacement::Bottom: {
+				const int overlayHeight = std::max(1, runtimeConfig.extraZoneHeight);
+				extraFrame->setGeometry(0,
+				                        std::max(0, height() - overlayHeight),
+				                        width(),
+				                        overlayHeight);
+				break;
+			}
+			case ExtraZonePlacement::Free:
+				extraFrame->setGeometry(runtimeConfig.extraZoneRect.x,
+				                        runtimeConfig.extraZoneRect.y,
+				                        std::max(1, runtimeConfig.extraZoneRect.width),
+				                        std::max(1, runtimeConfig.extraZoneRect.height));
+				break;
+			case ExtraZonePlacement::Top: {
+				const int overlayHeight = std::max(1, runtimeConfig.extraZoneHeight);
+				extraFrame->setGeometry(0, 0, width(), overlayHeight);
+				break;
+			}
+		}
 	}
 
 	void Browser::showExtraZoneOverlay()

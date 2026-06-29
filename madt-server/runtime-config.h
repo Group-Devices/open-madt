@@ -39,10 +39,19 @@ namespace Secretary::Madt {
 		TopRight
 	};
 
-	enum class ExtraZoneEdge
+	enum class ExtraZonePlacement
 	{
 		Top,
-		Bottom
+		Bottom,
+		Free
+	};
+
+	struct ExtraZoneRect
+	{
+		int x      = 0;
+		int y      = 0;
+		int width  = 640;
+		int height = 160;
 	};
 
 	struct RuntimeConfig
@@ -77,8 +86,9 @@ namespace Secretary::Madt {
 		int                    shortcutIconHeight      = 96;
 		int                    shortcutMaxCount        = 5;
 		bool                   shortcutAutoClose       = true;
+		ExtraZonePlacement     extraZonePlacement      = ExtraZonePlacement::Top;
 		int                    extraZoneHeight         = 160;
-		ExtraZoneEdge          extraZoneEdge           = ExtraZoneEdge::Top;
+		ExtraZoneRect          extraZoneRect;
 		SettingsState settings;
 	};
 
