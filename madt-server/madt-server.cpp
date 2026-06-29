@@ -267,7 +267,24 @@ namespace Secretary::Madt {
 
 	void Server::eraseOwnedTabs(struct bufferevent* bev)
 	{
-		(void)bev;
+		if (!runtimeConfig.tabLifetimeByConnection || bev == nullptr) {
+			return;
+		}
+
+		const auto it = connectionTabs.find(bev);
+		if (it == connectionTabs.end()) {
+			return;
+		}
+
+		const auto ownedTabs = it->second;
+		for (const auto& tabId : ownedTabs) {
+			if (tabId.empty()) {
+				continue;
+			}
+
+			Gui::KillTab(tabId, nullptr);
+			forgetOwnedTab(tabId);
+		}
 	}
 
 	Server::requestCode Server::convertStringToMadtRequest(const std::string& str)
