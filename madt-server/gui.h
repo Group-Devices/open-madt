@@ -45,6 +45,7 @@ namespace Secretary::Madt::Gui {
 	bool GetCharacteristics(CmdResponse* resp);
 	bool GetTabMap(CmdResponse* resp);
 	bool BlinkTab(const std::string& uuid, CmdResponse* resp);
+	bool CaptureScreenshot(const std::string& fileName, CmdResponse* resp);
 	bool PlaySound(const std::string& soundId,
 	               unsigned int       soundFlags,
 	               const std::string& soundFile,

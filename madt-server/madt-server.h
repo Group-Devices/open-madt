@@ -54,6 +54,7 @@ namespace Secretary::Madt {
 			IAmAlive,
 			GetTabMap,
 			GetShortcuts,
+			CaptureScreenshot,
 
 			Unknown
 		};
@@ -101,6 +102,7 @@ namespace Secretary::Madt {
 		void        handleActivateTab(struct bufferevent* bev, const json& request);
 		void        handleKillTab(struct bufferevent* bev, const json& request);
 		void        handleKillShortcut(struct bufferevent* bev, const json& request);
+		void        handleCaptureScreenshot(struct bufferevent* bev, const json& request);
 		bool        authorizeWithPassword(const json& request, const std::string& password) const;
 		bool        authorizeControlRequest(const json& request, const std::string& reqName);
 		std::string

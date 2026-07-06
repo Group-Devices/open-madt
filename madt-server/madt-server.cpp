@@ -334,7 +334,8 @@ namespace Secretary::Madt {
 			{ "KillShortcut", requestCode::KillShortcut },
 			{ "IAmAlive", requestCode::IAmAlive },
 			{ "GetTabMap", requestCode::GetTabMap },
-			{ "GetShortcuts", requestCode::GetShortcuts }
+			{ "GetShortcuts", requestCode::GetShortcuts },
+			{ "CaptureScreenshot", requestCode::CaptureScreenshot }
 		};
 
 		const auto it = mapCmd.find(str);
@@ -1086,6 +1087,33 @@ namespace Secretary::Madt {
 		sendResponse(bev, response);
 	}
 
+	void Server::handleCaptureScreenshot(struct bufferevent* bev, const json& request)
+	{
+		if (!authorizeControlRequest(request, "CaptureScreenshot") ||
+		    !request.contains("fileName") || !request["fileName"].is_string() ||
+		    request["fileName"].get<std::string>().empty()) {
+			sendResponse(bev, json{ { "retCode", returnCode::MTSRC_BAD_REQUEST } });
+			return;
+		}
+
+		json             response;
+		Gui::CmdResponse gResp;
+		const bool       retcode = Gui::CaptureScreenshot(request["fileName"], &gResp);
+		if (retcode) {
+			std::unique_lock<std::mutex> lock(gResp.mtx);
+			gResp.cv.wait(lock, [&gResp] { return gResp.ready; });
+			response["retCode"] = convertGuiResultToMadt(gResp.result);
+			if (gResp.result == Gui::CmdResponse::ResultCode::OK) {
+				response["fileName"] = gResp.payload.value("fileName", std::string());
+				response["width"]    = gResp.payload.value("width", 0);
+				response["height"]   = gResp.payload.value("height", 0);
+			}
+		} else {
+			response["retCode"] = returnCode::MTSRC_EXEC_ERROR;
+		}
+		sendResponse(bev, response);
+	}
+
 	void Server::request(struct bufferevent* bev, const std::string& data)
 	{
 		std::string& bufferedRequest = connectionBuffers[bev];
@@ -1150,6 +1178,9 @@ namespace Secretary::Madt {
 						break;
 					case requestCode::KillShortcut:
 						handleKillShortcut(bev, request);
+						break;
+					case requestCode::CaptureScreenshot:
+						handleCaptureScreenshot(bev, request);
 						break;
 					case requestCode::BlinkTab:
 						handleBlinkTab(bev, request);
