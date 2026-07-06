@@ -270,6 +270,44 @@ namespace Secretary::Madt::Gui {
 		return (browser != nullptr);
 	}
 
+	bool CaptureScreenshot(const std::string& fileName, CmdResponse* resp)
+	{
+		if (resp == nullptr || appInstance == nullptr) {
+			return false;
+		}
+
+		QMetaObject::invokeMethod(
+		  appInstance,
+		  [resp, fileName]() {
+			  CmdResponse::ResultCode ret = CmdResponse::ResultCode::EXEC_ERROR;
+			  try {
+				  if (browser != nullptr) {
+					  if (QWidget* currentPage = browser->currentWidget(); currentPage != nullptr) {
+						  const QString path = QString::fromStdString(fileName);
+						  QPixmap       pixmap = currentPage->grab();
+						  if (!pixmap.isNull() && pixmap.save(path)) {
+							  resp->payload = {
+								  { "fileName", QFileInfo(path).absoluteFilePath().toStdString() },
+								  { "width", pixmap.width() },
+								  { "height", pixmap.height() },
+							  };
+							  ret = CmdResponse::ResultCode::OK;
+						  }
+					  }
+				  }
+			  } catch (...) {
+				  ret = CmdResponse::ResultCode::EXEC_ERROR;
+			  }
+
+			  std::lock_guard<std::mutex> lock(resp->mtx);
+			  resp->result = ret;
+			  resp->ready  = true;
+			  resp->cv.notify_one();
+		  },
+		  Qt::QueuedConnection);
+		return true;
+	}
+
 	bool PlaySound(const std::string& soundId,
 	               unsigned int       soundFlags,
 	               const std::string& soundFile,
