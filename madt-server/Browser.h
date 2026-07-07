@@ -34,8 +34,15 @@ namespace Secretary::Madt::Gui {
 	{
 	  public:
 		CustomPage(QObject* parent = 0);
+#if defined(USE_WEBENGINEVIEW)
+		virtual void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
+		                                      const QString&                 message,
+		                                      int                            lineNumber,
+		                                      const QString&                 sourceID) override;
+#else
 		virtual void
-		javaScriptConsoleMessage(const QString& message, int lineNumber, const QString& sourceID);
+		javaScriptConsoleMessage(const QString& message, int lineNumber, const QString& sourceID) override;
+#endif
 	};
 
 	class WebView : public QVIEW
@@ -79,6 +86,7 @@ namespace Secretary::Madt::Gui {
 		explicit Browser(const RuntimeConfig& runtimeConfig, QWidget* parent = nullptr);
 		~Browser();
 		QWidget* currentWidget() const;
+		void     ApplySettings(const SettingsState& settings);
 
 	  signals:
 		void signalNewWebTab(const std::string& url,
@@ -162,6 +170,7 @@ namespace Secretary::Madt::Gui {
 		bool allocateAbsolutePosition(BrowserPage* page);
 		bool allocateZonePosition(BrowserPage* page, int preferredPos);
 		bool configureView(BrowserPage* page);
+		void applySettingsToView(WebView* view);
 		std::vector<BrowserPage*> pagesInDisplayOrder() const;
 		std::vector<int>          freePositionsInRange(int start, int end) const;
 		std::vector<BrowserPage*> pagesInRange(int start, int end) const;
@@ -176,6 +185,7 @@ namespace Secretary::Madt::Gui {
 		int                         maxShortcutCount() const;
 
 		RuntimeConfig                    runtimeConfig;
+		SettingsState                    currentSettings;
 		IconLoader                       iconLoader;
 		std::map<std::string, BrowserPage*> list;
 		std::map<std::string, ShortcutEntry*> shortcuts;
