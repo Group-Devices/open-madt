@@ -57,6 +57,7 @@ namespace Secretary::Madt {
 
 	struct BacklightConfig
 	{
+		std::string command;
 		std::string path;
 		int         maxValue = 255;
 		std::string maxValuePath;
@@ -66,6 +67,7 @@ namespace Secretary::Madt {
 	{
 		std::string command     = "amixer";
 		std::string controlName;
+		std::string script;
 	};
 
 	struct RuntimeConfig

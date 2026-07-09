@@ -245,6 +245,7 @@ namespace Secretary::Madt {
 				return;
 			}
 
+			loadOptionalString(*backlightIt, "command", config.backlight.command);
 			loadOptionalString(*backlightIt, "path", config.backlight.path);
 			loadOptionalString(*backlightIt, "maxValuePath", config.backlight.maxValuePath);
 			loadOptionalInt(*backlightIt, "maxValue", config.backlight.maxValue, 1, 65535);
@@ -263,6 +264,7 @@ namespace Secretary::Madt {
 
 			loadOptionalString(*audioVolumeIt, "command", config.audioVolume.command);
 			loadOptionalString(*audioVolumeIt, "controlName", config.audioVolume.controlName);
+			loadOptionalString(*audioVolumeIt, "script", config.audioVolume.script);
 		}
 
 		void loadSettings(const json& document, RuntimeConfig& config)

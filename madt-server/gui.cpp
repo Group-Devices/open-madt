@@ -120,6 +120,31 @@ namespace Secretary::Madt::Gui {
 
 		bool applyBacklightBrightness(const RuntimeConfig& config, int brightness)
 		{
+			if (!config.backlight.command.empty()) {
+				const int percent = (brightness * 100 + 127) / 255;
+				QProcess  process;
+				process.start(QString::fromStdString(config.backlight.command),
+				              { QString::number(percent) });
+				if (!process.waitForStarted() || !process.waitForFinished()) {
+					ELOG("Failed to start or wait for %s to apply MADT backlight brightness %d",
+					     config.backlight.command.c_str(),
+					     percent);
+					return false;
+				}
+				if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+					ELOG("Failed to apply MADT backlight via %s %d (exit=%d, stderr=%s)",
+					     config.backlight.command.c_str(),
+					     percent,
+					     process.exitCode(),
+					     process.readAllStandardError().toStdString().c_str());
+					return false;
+				}
+
+				ILOG("Applied MADT backlight via %s %d",
+				     config.backlight.command.c_str(),
+				     percent);
+				return true;
+			}
 			if (config.backlight.path.empty()) {
 				return true;
 			}
@@ -150,12 +175,36 @@ namespace Secretary::Madt::Gui {
 
 		bool applyAudioVolume(const RuntimeConfig& config, const SettingsState& settings)
 		{
+			const int percent = settingsVolumeToPercent(settings.volume);
+			const QString percentArg = QString::number(percent) + QStringLiteral("%");
+
+			if (!config.audioVolume.script.empty()) {
+				QProcess process;
+				process.start(QString::fromStdString(config.audioVolume.script),
+				              { QString::number(percent) });
+				if (!process.waitForStarted() || !process.waitForFinished()) {
+					ELOG("Failed to start or wait for %s to apply MADT audio volume %d",
+					     config.audioVolume.script.c_str(),
+					     percent);
+					return false;
+				}
+				if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+					ELOG("Failed to apply MADT audio volume via %s %d (exit=%d, stderr=%s)",
+					     config.audioVolume.script.c_str(),
+					     percent,
+					     process.exitCode(),
+					     process.readAllStandardError().toStdString().c_str());
+					return false;
+				}
+
+				ILOG("Applied MADT audio volume via %s %d",
+				     config.audioVolume.script.c_str(),
+				     percent);
+				return true;
+			}
 			if (config.audioVolume.controlName.empty()) {
 				return true;
 			}
-
-			const int percent = settingsVolumeToPercent(settings.volume);
-			const QString percentArg = QString::number(percent) + QStringLiteral("%");
 
 			QProcess process;
 			process.start(QString::fromStdString(config.audioVolume.command),
