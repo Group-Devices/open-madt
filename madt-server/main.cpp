@@ -20,13 +20,11 @@ int main(int argc, char* argv[])
 {
 	Server madtServer(25000);
 	std::thread t([argc, argv, &madtServer]() {
-		if (!Gui::waitForStartupReady()) {
-			return;
-		}
 		Process::setup(argc, argv, "madt", "madt");
 		WDOGINIT();
 		Process::timerCreate(wdogRearm, WATCHDOG_KICK_MS, NULL);
 		madtServer.start(Process::base());
+		// Service readiness should reflect control-socket availability, not GUI completion.
 		WDOGREADY();
 		Process::run();
 		WDOGDONE();
