@@ -3,6 +3,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cstdint>
 #include <map>
 #include <string>
 
@@ -54,6 +55,21 @@ namespace Secretary::Madt {
 		int height = 160;
 	};
 
+	struct BacklightConfig
+	{
+		std::string command;
+		std::string path;
+		int         maxValue = 255;
+		std::string maxValuePath;
+	};
+
+	struct AudioVolumeConfig
+	{
+		std::string command     = "amixer";
+		std::string controlName;
+		std::string script;
+	};
+
 	struct RuntimeConfig
 	{
 		std::string tabMapPassword;
@@ -89,12 +105,16 @@ namespace Secretary::Madt {
 		ExtraZonePlacement     extraZonePlacement      = ExtraZonePlacement::Top;
 		int                    extraZoneHeight         = 160;
 		ExtraZoneRect          extraZoneRect;
+		BacklightConfig        backlight;
+		AudioVolumeConfig      audioVolume;
 		SettingsState settings;
 	};
 
 	json          settingsToJson(const SettingsState& settings);
 	SettingsState mergeSettings(const SettingsState& current, const json& patch);
 	bool          isValidSettingsPatch(const json& patch, std::string& error);
+	int           settingsVolumeToPercent(const std::string& volume);
+	double        settingsVolumeToScalar(const std::string& volume);
 	RuntimeConfig loadRuntimeConfig();
 
 } // namespace Secretary::Madt

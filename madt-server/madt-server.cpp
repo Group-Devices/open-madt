@@ -938,20 +938,35 @@ namespace Secretary::Madt {
 			return;
 		}
 
-		settingsState = mergeSettings(settingsState, request);
-		if (dnsSdAdvertiser != nullptr) {
-			dnsSdAdvertiser->setTxt({
-			  { "txtvers", std::to_string(TXT_VERSION) },
-			  { "version", SPEC_VERSION },
-			  { "release", runtimeConfig.dnsSdRelease },
-			  { "swvers", SOFTWARE_VERSION },
-			  { "manufacturer", runtimeConfig.dnsSdManufacturer },
-			  { "atdatetime", currentTimestampUtc() },
-			  { "interval", std::to_string(runtimeConfig.dnsSdIntervalMinutes) },
-			  { "activemode", currentActiveModeDnsSdValue() },
-			});
+		SettingsState     updatedSettings = mergeSettings(settingsState, request);
+		json              response;
+		Gui::CmdResponse  gResp;
+		const bool queued = Gui::ApplySettings(updatedSettings, &gResp);
+		if (!queued) {
+			response["retCode"] = returnCode::MTSRC_EXEC_ERROR;
+			sendResponse(bev, response);
+			return;
 		}
-		sendResponse(bev, json{ { "retCode", returnCode::MTSRC_OK } });
+
+		std::unique_lock<std::mutex> lock(gResp.mtx);
+		gResp.cv.wait(lock, [&gResp] { return gResp.ready; });
+		response["retCode"] = convertGuiResultToMadt(gResp.result);
+		if (response["retCode"].get<int>() == static_cast<int>(returnCode::MTSRC_OK)) {
+			settingsState = std::move(updatedSettings);
+			if (dnsSdAdvertiser != nullptr) {
+				dnsSdAdvertiser->setTxt({
+				  { "txtvers", std::to_string(TXT_VERSION) },
+				  { "version", SPEC_VERSION },
+				  { "release", runtimeConfig.dnsSdRelease },
+				  { "swvers", SOFTWARE_VERSION },
+				  { "manufacturer", runtimeConfig.dnsSdManufacturer },
+				  { "atdatetime", currentTimestampUtc() },
+				  { "interval", std::to_string(runtimeConfig.dnsSdIntervalMinutes) },
+				  { "activemode", currentActiveModeDnsSdValue() },
+				});
+			}
+		}
+		sendResponse(bev, response);
 	}
 
 	void Server::handleStop(struct bufferevent* bev, const json& request)

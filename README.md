@@ -62,6 +62,10 @@ Currently supported keys:
   default `aplay`
 - `soundFiles`: mapping from standard MADT sound aliases such as
   `SystemNotification` to local file paths
+- `backlight`: optional object describing LCD brightness control with
+  `command`, `path`, `maxValue`, and/or `maxValuePath`
+- `audioVolume`: optional object describing runtime volume control with either
+  `script` or the legacy `command` + `controlName`
 - `tabBarVisible`: show or hide the tab bar
 - `tabBarEdge`: one of `top`, `bottom`, `left`, `right`
 - `tabBarWidth`: tab width in pixels
@@ -86,8 +90,10 @@ Currently supported keys:
 - `shortcutAutoClose`: close the popup after shortcut activation
 - `volume`, `brightness`, `contrast`, `language`, `defaultActiveMode`,
   `activeMode`, `defaultVisualMode`, `visualMode`, `extra1`, `extra2`:
-  initial values returned by `GetSettings` and updated in memory by
-  `SetSettings`
+  initial values returned by `GetSettings`; `SetSettings` updates the
+  live MADT state and applies supported runtime effects such as browser
+  volume propagation and backlight brightness, either directly or through
+  configured scripts
 
 If `tabLifetimeByConnection` is omitted, the standalone `open-madt` default is
 `false`.

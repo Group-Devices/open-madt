@@ -7,6 +7,8 @@
 
 #include <nlohmann/json.hpp>
 
+#include "runtime-config.h"
+
 namespace Secretary::Madt::Gui {
 
 	class CmdResponse
@@ -46,6 +48,7 @@ namespace Secretary::Madt::Gui {
 	bool GetTabMap(CmdResponse* resp);
 	bool BlinkTab(const std::string& uuid, CmdResponse* resp);
 	bool CaptureScreenshot(const std::string& fileName, CmdResponse* resp);
+	bool ApplySettings(const SettingsState& settings, CmdResponse* resp);
 	bool PlaySound(const std::string& soundId,
 	               unsigned int       soundFlags,
 	               const std::string& soundFile,

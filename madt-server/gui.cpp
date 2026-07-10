@@ -1,3 +1,6 @@
+#include <cerrno>
+#include <cstring>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -89,6 +92,149 @@ namespace Secretary::Madt::Gui {
 			}
 			startupCv.notify_all();
 		}
+
+		bool readBacklightMaxValue(const RuntimeConfig& config, int& maxValue)
+		{
+			if (config.backlight.maxValue > 0) {
+				maxValue = config.backlight.maxValue;
+			}
+			if (config.backlight.maxValuePath.empty()) {
+				return maxValue > 0;
+			}
+
+			std::ifstream ifs(config.backlight.maxValuePath);
+			if (!ifs.is_open()) {
+				ELOG("Failed to open MADT backlight maxValuePath %s: %s",
+				     config.backlight.maxValuePath.c_str(),
+				     strerror(errno));
+				return false;
+			}
+
+			if (!(ifs >> maxValue) || maxValue <= 0) {
+				ELOG("Failed to parse MADT backlight maxValuePath %s",
+				     config.backlight.maxValuePath.c_str());
+				return false;
+			}
+			return true;
+		}
+
+		bool applyBacklightBrightness(const RuntimeConfig& config, int brightness)
+		{
+			if (!config.backlight.command.empty()) {
+				const int percent = (brightness * 100 + 127) / 255;
+				QProcess  process;
+				process.start(QString::fromStdString(config.backlight.command),
+				              { QString::number(percent) });
+				if (!process.waitForStarted() || !process.waitForFinished()) {
+					ELOG("Failed to start or wait for %s to apply MADT backlight brightness %d",
+					     config.backlight.command.c_str(),
+					     percent);
+					return false;
+				}
+				if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+					ELOG("Failed to apply MADT backlight via %s %d (exit=%d, stderr=%s)",
+					     config.backlight.command.c_str(),
+					     percent,
+					     process.exitCode(),
+					     process.readAllStandardError().toStdString().c_str());
+					return false;
+				}
+
+				ILOG("Applied MADT backlight via %s %d",
+				     config.backlight.command.c_str(),
+				     percent);
+				return true;
+			}
+			if (config.backlight.path.empty()) {
+				return true;
+			}
+
+			int maxValue = 0;
+			if (!readBacklightMaxValue(config, maxValue)) {
+				return false;
+			}
+
+			const int rawValue = (brightness * maxValue + 127) / 255;
+			std::ofstream ofs(config.backlight.path);
+			if (!ofs.is_open()) {
+				ELOG("Failed to open MADT backlight path %s: %s",
+				     config.backlight.path.c_str(),
+				     strerror(errno));
+				return false;
+			}
+
+			ofs << rawValue;
+			if (!ofs.good()) {
+				ELOG("Failed to write MADT backlight path %s",
+				     config.backlight.path.c_str());
+				return false;
+			}
+
+			return true;
+		}
+
+		bool applyAudioVolume(const RuntimeConfig& config, const SettingsState& settings)
+		{
+			const int percent = settingsVolumeToPercent(settings.volume);
+			const QString percentArg = QString::number(percent) + QStringLiteral("%");
+
+			if (!config.audioVolume.script.empty()) {
+				QProcess process;
+				process.start(QString::fromStdString(config.audioVolume.script),
+				              { QString::number(percent) });
+				if (!process.waitForStarted() || !process.waitForFinished()) {
+					ELOG("Failed to start or wait for %s to apply MADT audio volume %d",
+					     config.audioVolume.script.c_str(),
+					     percent);
+					return false;
+				}
+				if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+					ELOG("Failed to apply MADT audio volume via %s %d (exit=%d, stderr=%s)",
+					     config.audioVolume.script.c_str(),
+					     percent,
+					     process.exitCode(),
+					     process.readAllStandardError().toStdString().c_str());
+					return false;
+				}
+
+				ILOG("Applied MADT audio volume via %s %d",
+				     config.audioVolume.script.c_str(),
+				     percent);
+				return true;
+			}
+			if (config.audioVolume.controlName.empty()) {
+				return true;
+			}
+
+			QProcess process;
+			process.start(QString::fromStdString(config.audioVolume.command),
+			              { QStringLiteral("-q"),
+			                QStringLiteral("sset"),
+			                QString::fromStdString(config.audioVolume.controlName),
+			                percentArg });
+			if (!process.waitForStarted() || !process.waitForFinished()) {
+				ELOG("Failed to start or wait for %s to apply MADT audio volume %s %s",
+				     config.audioVolume.command.c_str(),
+				     config.audioVolume.controlName.c_str(),
+				     percentArg.toStdString().c_str());
+				return false;
+			}
+			if (process.exitStatus() != QProcess::NormalExit || process.exitCode() != 0) {
+				ELOG("Failed to apply MADT audio volume via %s %s %s (exit=%d, stderr=%s)",
+				     config.audioVolume.command.c_str(),
+				     config.audioVolume.controlName.c_str(),
+				     percentArg.toStdString().c_str(),
+				     process.exitCode(),
+				     process.readAllStandardError().toStdString().c_str());
+				return false;
+			}
+
+			ILOG("Applied MADT audio volume via %s %s %s",
+			     config.audioVolume.command.c_str(),
+			     config.audioVolume.controlName.c_str(),
+			     percentArg.toStdString().c_str());
+			return true;
+		}
 	} // namespace
 
 	int run(int argc, char* argv[])
@@ -142,6 +288,13 @@ namespace Secretary::Madt::Gui {
 				browser->resize(browserGeometry.size());
 			}
 			browser->show();
+			browser->ApplySettings(runtimeConfig.settings);
+			if (!applyAudioVolume(runtimeConfig, runtimeConfig.settings)) {
+				WLOG("Failed to apply initial MADT audio volume");
+			}
+			if (!applyBacklightBrightness(runtimeConfig, runtimeConfig.settings.brightness)) {
+				WLOG("Failed to apply initial MADT backlight brightness");
+			}
 			browser->raise();
 			mainWindow->raise();
 			mainWindow->activateWindow();
@@ -285,16 +438,63 @@ namespace Secretary::Madt::Gui {
 					  if (QWidget* currentPage = browser->currentWidget(); currentPage != nullptr) {
 						  const QString path = QString::fromStdString(fileName);
 						  QPixmap       pixmap = currentPage->grab();
-						  if (!pixmap.isNull() && pixmap.save(path)) {
+						  if (pixmap.isNull()) {
+							  ELOG("MADT screenshot capture returned a null pixmap for %s",
+							       fileName.c_str());
+						  } else if (pixmap.save(path)) {
 							  resp->payload = {
 								  { "fileName", QFileInfo(path).absoluteFilePath().toStdString() },
 								  { "width", pixmap.width() },
 								  { "height", pixmap.height() },
 							  };
 							  ret = CmdResponse::ResultCode::OK;
+						  } else {
+							  ELOG("MADT failed to save screenshot to %s", fileName.c_str());
 						  }
+					  } else {
+						  ELOG("MADT screenshot capture failed because there is no active page");
 					  }
+				  } else {
+					  ELOG("MADT screenshot capture failed because the browser is not available");
 				  }
+			  } catch (const std::exception& e) {
+				  ELOG("MADT screenshot capture threw an exception for %s: %s",
+				       fileName.c_str(),
+				       e.what());
+				  ret = CmdResponse::ResultCode::EXEC_ERROR;
+			  } catch (...) {
+				  ELOG("MADT screenshot capture threw an unknown exception for %s",
+				       fileName.c_str());
+				  ret = CmdResponse::ResultCode::EXEC_ERROR;
+			  }
+
+			  std::lock_guard<std::mutex> lock(resp->mtx);
+			  resp->result = ret;
+			  resp->ready  = true;
+			  resp->cv.notify_one();
+		  },
+		  Qt::QueuedConnection);
+		return true;
+	}
+
+	bool ApplySettings(const SettingsState& settings, CmdResponse* resp)
+	{
+		if (resp == nullptr || appInstance == nullptr) {
+			return false;
+		}
+
+		QMetaObject::invokeMethod(
+		  appInstance,
+		  [resp, settings]() {
+			  CmdResponse::ResultCode ret = CmdResponse::ResultCode::EXEC_ERROR;
+			  try {
+				  bool applied = true;
+				  if (browser != nullptr) {
+					  browser->ApplySettings(settings);
+				  }
+				  applied = applyAudioVolume(runtimeConfig, settings) && applied;
+				  applied = applyBacklightBrightness(runtimeConfig, settings.brightness) && applied;
+				  ret     = applied ? CmdResponse::ResultCode::OK : CmdResponse::ResultCode::EXEC_ERROR;
 			  } catch (...) {
 				  ret = CmdResponse::ResultCode::EXEC_ERROR;
 			  }

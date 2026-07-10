@@ -4,6 +4,8 @@
 #include <QtCore/QPoint>
 #include <QtCore/QString>
 #include <QtCore/QUrl>
+#include <QtCore/QVariant>
+#include <QtCore/QtGlobal>
 #include <QtGui/QDesktopServices>
 #include <QtGui/QColor>
 #include <QtGui/QIcon>
@@ -15,6 +17,7 @@
 #include <QtWidgets/QTabBar>
 #include <QtWidgets/QVBoxLayout>
 #if !defined(USE_WEBENGINEVIEW)
+#include <QtWebKit/QWebSettings>
 #include <QtWebKitWidgets/QWebFrame>
 #endif
 
@@ -103,14 +106,29 @@ namespace Secretary::Madt::Gui {
 	{
 	}
 
+#if defined(USE_WEBENGINEVIEW)
+	void CustomPage::javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
+	                                          const QString&                 message,
+	                                          int                            lineNumber,
+	                                          const QString&                 sourceID)
+	{
+		(void)level;
+		TLOG("javascript %s:%d %s",
+		     qPrintable(sourceID),
+		     lineNumber,
+		     qPrintable(message));
+	}
+#else
 	void CustomPage::javaScriptConsoleMessage(const QString& message,
 	                                          int            lineNumber,
 	                                          const QString& sourceID)
 	{
-		(void)lineNumber;
-		(void)sourceID;
-		TLOG("javascript %s", qPrintable(message));
+		TLOG("javascript %s:%d %s",
+		     qPrintable(sourceID),
+		     lineNumber,
+		     qPrintable(message));
 	}
+#endif
 
 	WebView::WebView(QWidget* parent)
 	  : QVIEW(parent)
@@ -118,6 +136,11 @@ namespace Secretary::Madt::Gui {
 		CustomPage* webPage = new CustomPage(this);
 		setContextMenuPolicy(Qt::NoContextMenu);
 		setPage(webPage);
+#if !defined(USE_WEBENGINEVIEW)
+		if (page() != nullptr && page()->settings() != nullptr) {
+			page()->settings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, true);
+		}
+#endif
 	}
 
 	WebView::~WebView() {}
@@ -125,6 +148,7 @@ namespace Secretary::Madt::Gui {
 	Browser::Browser(const RuntimeConfig& runtimeConfig, QWidget* parent)
 	  : QWidget(parent)
 	  , runtimeConfig(runtimeConfig)
+	  , currentSettings(runtimeConfig.settings)
 	  , iconLoader(this)
 	{
 		auto* layout = new QVBoxLayout(this);
@@ -216,6 +240,14 @@ namespace Secretary::Madt::Gui {
 	QWidget* Browser::currentWidget() const
 	{
 		return tabs != nullptr ? tabs->currentWidget() : nullptr;
+	}
+
+	void Browser::ApplySettings(const SettingsState& settings)
+	{
+		currentSettings = settings;
+		for (const auto& entry : list) {
+			applySettingsToView(entry.second->view);
+		}
 	}
 
 	void Browser::resizeEvent(QResizeEvent* event)
@@ -766,7 +798,45 @@ namespace Secretary::Madt::Gui {
 		(void)FLAG_NO_SCROLLBARS;
 #endif
 
+		connect(page->view, &QVIEW::loadFinished, this, [this, view = page->view](bool ok) {
+			if (ok) {
+				applySettingsToView(view);
+			}
+		});
+
 		return true;
+	}
+
+	void Browser::applySettingsToView(WebView* view)
+	{
+		if (view == nullptr || view->page() == nullptr) {
+			return;
+		}
+
+		nlohmann::json settings = settingsToJson(currentSettings);
+		settings["volumePercent"] = settingsVolumeToPercent(currentSettings.volume);
+		settings["volumeScalar"]  = settingsVolumeToScalar(currentSettings.volume);
+
+		const QString script = QString::fromStdString(
+		  "(function(){"
+		  "window.madtSettings=" + settings.dump() + ";"
+		  "var madtEvent;"
+		  "try {"
+		  "  madtEvent = new CustomEvent('madt-settings-changed', {detail: window.madtSettings});"
+		  "} catch (e) {"
+		  "  madtEvent = document.createEvent('CustomEvent');"
+		  "  madtEvent.initCustomEvent('madt-settings-changed', false, false, window.madtSettings);"
+		  "}"
+		  "window.dispatchEvent(madtEvent);"
+		  "})();");
+
+#if defined(USE_WEBENGINEVIEW)
+		view->page()->runJavaScript(script);
+#else
+		if (view->page()->mainFrame() != nullptr) {
+			view->page()->mainFrame()->evaluateJavaScript(script);
+		}
+#endif
 	}
 
 	void Browser::onNewWebTab(const std::string& url,

@@ -1,5 +1,7 @@
 #include "runtime-config.h"
 
+#include <cmath>
+#include <limits>
 #include <filesystem>
 
 #include "loghelper/log.h"
@@ -232,6 +234,39 @@ namespace Secretary::Madt {
 				loadOptionalInt(document, "extraZoneHeight", config.extraZoneHeight, 1, MAX_EXTRA_ZONE_DIMENSION);
 		}
 
+		void loadBacklight(const json& document, RuntimeConfig& config)
+		{
+			const auto backlightIt = document.find("backlight");
+			if (backlightIt == document.end() || backlightIt->is_null()) {
+				return;
+			}
+			if (!backlightIt->is_object()) {
+				ELOG("MADT configuration %s has non-object backlight", CONFIG_FILENAME);
+				return;
+			}
+
+			loadOptionalString(*backlightIt, "command", config.backlight.command);
+			loadOptionalString(*backlightIt, "path", config.backlight.path);
+			loadOptionalString(*backlightIt, "maxValuePath", config.backlight.maxValuePath);
+			loadOptionalInt(*backlightIt, "maxValue", config.backlight.maxValue, 1, 65535);
+		}
+
+		void loadAudioVolume(const json& document, RuntimeConfig& config)
+		{
+			const auto audioVolumeIt = document.find("audioVolume");
+			if (audioVolumeIt == document.end() || audioVolumeIt->is_null()) {
+				return;
+			}
+			if (!audioVolumeIt->is_object()) {
+				ELOG("MADT configuration %s has non-object audioVolume", CONFIG_FILENAME);
+				return;
+			}
+
+			loadOptionalString(*audioVolumeIt, "command", config.audioVolume.command);
+			loadOptionalString(*audioVolumeIt, "controlName", config.audioVolume.controlName);
+			loadOptionalString(*audioVolumeIt, "script", config.audioVolume.script);
+		}
+
 		void loadSettings(const json& document, RuntimeConfig& config)
 		{
 			loadOptionalString(document, "volume", config.settings.volume);
@@ -344,6 +379,40 @@ namespace Secretary::Madt {
 			return reject("visualMode must be MUTE, UNMUTE, or DEGRADED");
 		}
 		return true;
+	}
+
+	int settingsVolumeToPercent(const std::string& volume)
+	{
+		if (volume.empty()) {
+			return 100;
+		}
+
+		try {
+			std::size_t     parsedChars = 0;
+			const bool      isHex = volume.size() > 2 && volume[0] == '0' &&
+			                   (volume[1] == 'x' || volume[1] == 'X');
+			const std::uint64_t raw = std::stoull(volume, &parsedChars, isHex ? 16 : 10);
+			if (parsedChars != volume.size()) {
+				return 100;
+			}
+
+			if (!isHex && raw <= 100U) {
+				return static_cast<int>(raw);
+			}
+
+			const auto clamped =
+			  std::min<std::uint64_t>(raw, std::numeric_limits<std::uint32_t>::max());
+			return static_cast<int>(std::lround(
+			  (static_cast<double>(clamped) * 100.0) /
+			  static_cast<double>(std::numeric_limits<std::uint32_t>::max())));
+		} catch (...) {
+			return 100;
+		}
+	}
+
+	double settingsVolumeToScalar(const std::string& volume)
+	{
+		return static_cast<double>(settingsVolumeToPercent(volume)) / 100.0;
 	}
 
 	SettingsState mergeSettings(const SettingsState& current, const json& patch)
@@ -464,6 +533,8 @@ namespace Secretary::Madt {
 		loadOptionalBool(document, "shortcutAutoClose", config.shortcutAutoClose);
 		loadExtraZonePlacement(document, config);
 		loadExtraZoneGeometry(document, config);
+		loadBacklight(document, config);
+		loadAudioVolume(document, config);
 		loadSettings(document, config);
 		return config;
 	}
