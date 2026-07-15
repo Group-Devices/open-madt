@@ -560,13 +560,6 @@ namespace Secretary::Madt {
 				--depth;
 				if (depth == 0) {
 					const std::size_t end = i + 1;
-					for (std::size_t tail = end; tail < buffer.size(); ++tail) {
-						if (std::isspace(static_cast<unsigned char>(buffer[tail])) == 0) {
-							requestText = buffer.substr(start);
-							buffer.clear();
-							return true;
-						}
-					}
 					requestText = buffer.substr(start, end - start);
 					buffer.erase(0, end);
 					return true;
@@ -1135,13 +1128,10 @@ namespace Secretary::Madt {
 		bufferedRequest.append(data);
 
 		std::string requestText;
-		if (!extractSingleJsonObject(bufferedRequest, requestText)) {
-			return;
-		}
-
-		try {
-			const json request = json::parse(requestText);
-			TLOG("Get madt request %s", request.dump().c_str());
+		while (extractSingleJsonObject(bufferedRequest, requestText)) {
+			try {
+				const json request = json::parse(requestText);
+				TLOG("Get madt request %s", request.dump().c_str());
 				switch (convertStringToMadtRequest(request["req"])) {
 					case requestCode::GetRandom:
 						handleGetRandom(bev);
@@ -1204,10 +1194,11 @@ namespace Secretary::Madt {
 					default:
 						sendResponse(bev, json{ { "retCode", returnCode::MTSRC_BAD_REQUEST } });
 						break;
+				}
+			} catch (...) {
+				ELOG("Error parsing madt request");
+				sendResponse(bev, json{ { "retCode", returnCode::MTSRC_BAD_REQUEST } });
 			}
-		} catch (...) {
-			ELOG("Error parsing madt request");
-			sendResponse(bev, json{ { "retCode", returnCode::MTSRC_BAD_REQUEST } });
 		}
 	}
 }
