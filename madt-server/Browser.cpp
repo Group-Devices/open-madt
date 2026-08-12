@@ -16,6 +16,9 @@
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QTabBar>
 #include <QtWidgets/QVBoxLayout>
+#if defined(USE_WEBENGINEVIEW)
+#include <QtWebEngineCore/QWebEngineProfile>
+#endif
 #if !defined(USE_WEBENGINEVIEW)
 #include <QtWebKit/QWebSettings>
 #include <QtWebKitWidgets/QWebFrame>
@@ -134,6 +137,12 @@ namespace Secretary::Madt::Gui {
 	  : QVIEW(parent)
 	{
 		CustomPage* webPage = new CustomPage(this);
+		// UI sites are supplied by independent Secretary services. They can be
+		// upgraded and restarted without restarting the external MADT browser, so
+		// a new or recreated tab must never be populated from WebEngine's cache.
+#if defined(USE_WEBENGINEVIEW)
+		webPage->profile()->setHttpCacheType(QWebEngineProfile::NoCache);
+#endif
 		setContextMenuPolicy(Qt::NoContextMenu);
 		setPage(webPage);
 #if !defined(USE_WEBENGINEVIEW)
